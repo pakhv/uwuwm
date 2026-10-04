@@ -1,5 +1,6 @@
 #define COBJMACROS
 
+#include "main.h"
 #include <Windows.h>
 #include <fcntl.h>
 #include <io.h>
@@ -7,14 +8,7 @@
 #include <stdio.h>
 #include <uiautomation.h>
 
-typedef struct {
-  HWND *handle;
-  size_t length;
-  size_t capacity;
-} wnd_array;
-
 wnd_array *g_wnd_arr;
-wnd_array g_wnd_arr1;
 
 void wnd_array_add(wnd_array *arr, HWND *handle) {
   if (arr->capacity <= arr->length) {
