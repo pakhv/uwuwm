@@ -1,12 +1,28 @@
 #include <Windows.h>
 #include <stdio.h>
 
-typedef struct {
-  HWND *handle;
-  size_t length;
-  size_t capacity;
-} wnd_array;
+#define DEFINE_VECTOR(T)                                                       \
+  typedef struct {                                                             \
+    T *data;                                                                   \
+    size_t size;                                                               \
+    size_t capacity;                                                           \
+  } Vector_##T;
+
+DEFINE_VECTOR(HWND)
+
+// DEFINE_VECTOR(workspace)
+
+// typedef struct {
+//   size_t num;
+//   Vector_HWND *windows;
+// } workspace;
 
 typedef struct {
-  wnd_array windows;
-} wm_params;
+  HWND *handle;
+  // workspace workspace;
+} Wnd_info;
+
+typedef struct {
+  // workspace *workspaces;
+  Vector_HWND *windows;
+} Wm_params;

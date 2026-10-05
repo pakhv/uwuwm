@@ -8,62 +8,48 @@
 #include <stdio.h>
 #include <uiautomation.h>
 
-wnd_array *g_wnd_arr;
+void wnd_array_add(Vector_HWND *arr, HWND *handle);
+BOOL CALLBACK enum_windows_proc(HWND handle, LPARAM l_param);
+void position_windows(Vector_HWND *arr);
 
-void wnd_array_add(wnd_array *arr, HWND *handle) {
-  if (arr->capacity <= arr->length) {
-    arr->capacity = 2 * (arr->length + 1) * sizeof(HWND);
-    arr->handle = realloc(arr->handle, arr->capacity);
-  }
+Wm_params *init(void) {
+  Wm_params *wm_params = malloc(sizeof(Wm_params));
+  wm_params->windows = malloc(sizeof(Vector_HWND));
 
-  arr->handle[arr->length] = *handle;
-  arr->length += 1;
+  wm_params->windows->size = 0;
+  wm_params->windows->capacity = 0;
+  wm_params->windows->data = NULL;
+
+  EnumWindows(enum_windows_proc, (LPARAM)wm_params->windows);
+
+  return wm_params;
 }
-
-BOOL CALLBACK EnumWindowsProc(HWND handle, LPARAM l_param) {
-  wchar_t buff[255];
-
-  if (IsWindowVisible(handle)) {
-    wnd_array_add(g_wnd_arr, &handle);
-  }
-
-  return TRUE;
-}
-
-#define WND_ARR_ADD(This, Element)                                             \
-  do {                                                                         \
-    if (This.capacity <= This.length + 1) {                                    \
-      This.capacity = 2 * (This.length + 1) * sizeof(char);                    \
-      This.handle = realloc(This.handle, This.capacity);                       \
-    }                                                                          \
-    This.handle[This.length] = Element;                                        \
-    This.length += 1;                                                          \
-  } while (0)
 
 void main(void) {
   // setlocale(LC_ALL, "");
   // SetConsoleOutputCP(CP_UTF8);
   // _setmode(_fileno(stdout), _O_U16TEXT);
 
-  g_wnd_arr = malloc(sizeof(wnd_array));
-  g_wnd_arr->length = 0;
-  g_wnd_arr->capacity = 0;
-  g_wnd_arr->handle = NULL;
+  Wm_params *wm_params = init();
+  Vector_HWND *windows = wm_params->windows;
 
-  EnumWindows(EnumWindowsProc, 0);
+  position_windows(windows);
 
-  free(g_wnd_arr);
+  free(wm_params->windows);
+  free(wm_params);
+}
 
-  HDWP hdwp = BeginDeferWindowPos(g_wnd_arr->length);
+void position_windows(Vector_HWND *windows) {
+  HDWP hdwp = BeginDeferWindowPos(windows->size);
   if (hdwp == NULL) {
     printf("Failed\n");
     return;
   }
 
-  printf("Windows num: %zu\n", g_wnd_arr->length);
+  printf("Windows num: %zu\n", windows->size);
 
-  for (size_t i = 0; i < g_wnd_arr->length; i++) {
-    HWND wnd = g_wnd_arr->handle[i];
+  for (size_t i = 0; i < windows->size; i++) {
+    HWND wnd = windows->data[i];
     // DWORD p_id = 0;
     // GetWindowThreadProcessId(wnd, &p_id);
     // printf("window %zu: %d\n", i, p_id);
@@ -84,6 +70,27 @@ void main(void) {
   if (!EndDeferWindowPos(hdwp)) {
     printf("Failed\n");
   }
+}
+
+void wnd_array_add(Vector_HWND *arr, HWND *handle) {
+  if (arr->capacity <= arr->size) {
+    arr->capacity = 2 * (arr->size + 1) * sizeof(HWND);
+    arr->data = realloc(arr->data, arr->capacity);
+  }
+
+  arr->data[arr->size] = *handle;
+  arr->size += 1;
+}
+
+BOOL CALLBACK enum_windows_proc(HWND handle, LPARAM l_param) {
+  Vector_HWND *windows = (Vector_HWND *)l_param;
+  wchar_t buff[255];
+
+  if (IsWindowVisible(handle)) {
+    wnd_array_add(windows, &handle);
+  }
+
+  return TRUE;
 }
 
 // IUIAutomation *g_pAutomation = NULL;
