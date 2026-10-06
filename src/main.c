@@ -8,38 +8,35 @@
 #include <stdio.h>
 #include <uiautomation.h>
 
-void wnd_array_add(Vector_HWND *arr, HWND *handle);
+void wnd_array_add(Vector_Window *arr, Window *handle);
 BOOL CALLBACK enum_windows_proc(HWND handle, LPARAM l_param);
-void position_windows(Vector_HWND *arr);
+void position_windows(Vector_Window *arr);
 
-Wm_params *init(void) {
-  Wm_params *wm_params = malloc(sizeof(Wm_params));
-  wm_params->windows = malloc(sizeof(Vector_HWND));
+void init(Wm_params *wm_params) {
+  wm_params->active_workspace = 1;
+  wm_params->windows = malloc(sizeof(Vector_Window));
 
   wm_params->windows->size = 0;
   wm_params->windows->capacity = 0;
   wm_params->windows->data = NULL;
 
   EnumWindows(enum_windows_proc, (LPARAM)wm_params->windows);
-
-  return wm_params;
 }
 
 void main(void) {
   // setlocale(LC_ALL, "");
   // SetConsoleOutputCP(CP_UTF8);
   // _setmode(_fileno(stdout), _O_U16TEXT);
+  Wm_params wm_params = {0};
+  init(&wm_params);
 
-  Wm_params *wm_params = init();
-  Vector_HWND *windows = wm_params->windows;
-
+  Vector_Window *windows = wm_params.windows;
   position_windows(windows);
 
-  free(wm_params->windows);
-  free(wm_params);
+  free(windows);
 }
 
-void position_windows(Vector_HWND *windows) {
+void position_windows(Vector_Window *windows) {
   HDWP hdwp = BeginDeferWindowPos(windows->size);
   if (hdwp == NULL) {
     printf("Failed\n");
@@ -49,7 +46,7 @@ void position_windows(Vector_HWND *windows) {
   printf("Windows num: %zu\n", windows->size);
 
   for (size_t i = 0; i < windows->size; i++) {
-    HWND wnd = windows->data[i];
+    HWND wnd = windows->data[i].handle;
     // DWORD p_id = 0;
     // GetWindowThreadProcessId(wnd, &p_id);
     // printf("window %zu: %d\n", i, p_id);
@@ -72,22 +69,69 @@ void position_windows(Vector_HWND *windows) {
   }
 }
 
-void wnd_array_add(Vector_HWND *arr, HWND *handle) {
+void wnd_array_add(Vector_Window *arr, Window *el) {
   if (arr->capacity <= arr->size) {
     arr->capacity = 2 * (arr->size + 1) * sizeof(HWND);
     arr->data = realloc(arr->data, arr->capacity);
   }
 
-  arr->data[arr->size] = *handle;
+  arr->data[arr->size] = *el;
   arr->size += 1;
 }
 
-BOOL CALLBACK enum_windows_proc(HWND handle, LPARAM l_param) {
-  Vector_HWND *windows = (Vector_HWND *)l_param;
+void extract_exe_name(char *path, DWORD p_l, char *name) {
+  size_t last_slash = -1;
+
+  for (size_t i = 0; i < p_l; i++) {
+    if (path[i] == '\\') {
+      last_slash = i;
+    }
+  }
+
+  size_t name_l = p_l - 1 - last_slash;
+
+  for (size_t i = 0; i < name_l; i++) {
+    name[i] = path[last_slash + 1 + i];
+  }
+
+  name[name_l] = '\0';
+}
+
+void get_process_name_by_window(HWND h_wnd, char *p_name) {
+  DWORD p_id = 0;
+  if (!GetWindowThreadProcessId(h_wnd, &p_id)) {
+    return;
+  }
+
+  HANDLE h_p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, p_id);
+  char p_full_path[MAX_EXE_PATH_LENGTH];
+  DWORD p_path_l = MAX_EXE_PATH_LENGTH;
+
+  if (!QueryFullProcessImageNameA(h_p, 0, p_full_path, &p_path_l)) {
+    return;
+  }
+
+  extract_exe_name(p_full_path, p_path_l, p_name);
+}
+
+BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
+  Vector_Window *windows = (Vector_Window *)l_param;
   wchar_t buff[255];
 
-  if (IsWindowVisible(handle)) {
-    wnd_array_add(windows, &handle);
+  if (IsWindowVisible(h_wnd)) {
+    Window *window = malloc(sizeof(Window));
+    // HMONITOR monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+
+    window->handle = h_wnd;
+
+    char *p_name = malloc(sizeof(char) * MAX_EXE_PATH_LENGTH);
+    get_process_name_by_window(h_wnd, p_name);
+
+    window->process_name = p_name;
+
+    printf("%s\n", window->process_name);
+
+    wnd_array_add(windows, window);
   }
 
   return TRUE;
