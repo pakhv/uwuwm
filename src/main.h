@@ -8,6 +8,13 @@
     size_t capacity;                                                           \
   } Vector_##T;
 
+#define INIT_VECTOR(p)                                                         \
+  do {                                                                         \
+    p->size = 0;                                                               \
+    p->capacity = 0;                                                           \
+    p->data = NULL;                                                            \
+  } while (0);
+
 typedef struct {
   size_t num;
   HMONITOR monitor;
@@ -16,15 +23,16 @@ typedef struct {
 typedef struct {
   HWND handle;
   char *process_name;
-  Workspace workspace;
+  Workspace *workspace;
 } Window;
 
-DEFINE_VECTOR(HWND)
 DEFINE_VECTOR(Window)
+DEFINE_VECTOR(Workspace)
 
 typedef struct {
   size_t active_workspace;
   Vector_Window *windows;
+  Vector_Workspace *workspaces;
 } Wm_params;
 
 #define MAX_EXE_PATH_LENGTH 300

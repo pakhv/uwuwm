@@ -10,31 +10,37 @@
 #include <uiautomation.h>
 
 void wnd_array_add(Vector_Window *arr, Window *handle);
-BOOL CALLBACK enum_windows_proc(HWND handle, LPARAM l_param);
+BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
+BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
+                                 LPARAM l_param);
 void position_windows(Vector_Window *arr);
 
 void init(Wm_params *wm_params) {
   wm_params->active_workspace = 1;
   wm_params->windows = malloc(sizeof(Vector_Window));
+  wm_params->workspaces = malloc(sizeof(Vector_Workspace));
 
-  wm_params->windows->size = 0;
-  wm_params->windows->capacity = 0;
-  wm_params->windows->data = NULL;
+  INIT_VECTOR(wm_params->windows)
+  INIT_VECTOR(wm_params->workspaces)
 
-  EnumWindows(enum_windows_proc, (LPARAM)wm_params->windows);
+  EnumDisplayMonitors(NULL, NULL, enum_monitors_proc,
+                      (LPARAM)wm_params->workspaces);
+  EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 }
 
 void main(void) {
-  // setlocale(LC_ALL, "");
-  // SetConsoleOutputCP(CP_UTF8);
-  // _setmode(_fileno(stdout), _O_U16TEXT);
   Wm_params wm_params = {0};
   init(&wm_params);
 
   Vector_Window *windows = wm_params.windows;
+
+  printf("Windows num: %zu\n", windows->size);
+  printf("Workspaces num: %zu\n", wm_params.workspaces->size);
+
   position_windows(windows);
 
   free(windows);
+  free(wm_params.workspaces);
 }
 
 void position_windows(Vector_Window *windows) {
@@ -43,8 +49,6 @@ void position_windows(Vector_Window *windows) {
     printf("Failed\n");
     return;
   }
-
-  printf("Windows num: %zu\n", windows->size);
 
   for (size_t i = 0; i < windows->size; i++) {
     HWND wnd = windows->data[i].handle;
@@ -67,10 +71,20 @@ void position_windows(Vector_Window *windows) {
   }
 }
 
+void workspace_array_add(Vector_Workspace *arr, Workspace *el) {
+  if (arr->capacity <= arr->size) {
+    arr->capacity = 2 * (arr->size + 1);
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace));
+  }
+
+  arr->data[arr->size] = *el;
+  arr->size += 1;
+}
+
 void wnd_array_add(Vector_Window *arr, Window *el) {
   if (arr->capacity <= arr->size) {
-    arr->capacity = 2 * (arr->size + 1) * sizeof(HWND);
-    arr->data = realloc(arr->data, arr->capacity);
+    arr->capacity = 2 * (arr->size + 1);
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Window));
   }
 
   arr->data[arr->size] = *el;
@@ -115,8 +129,8 @@ void get_process_name_by_window(HWND h_wnd, char *p_name) {
 }
 
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
-  Vector_Window *windows = (Vector_Window *)l_param;
-  wchar_t buff[255];
+  Wm_params *wm_params = (Wm_params *)l_param;
+  Vector_Window *windows = wm_params->windows;
 
   if (!IsWindowVisible(h_wnd)) {
     return TRUE;
@@ -136,7 +150,8 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
 
   Window *window = malloc(sizeof(Window));
   window->handle = h_wnd;
-  // HMONITOR monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+  // assigning first workspace to all windows
+  window->workspace = &wm_params->workspaces->data[0];
 
   char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
   get_process_name_by_window(h_wnd, p_name);
@@ -149,157 +164,15 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
   return TRUE;
 }
 
-// IUIAutomation *g_pAutomation = NULL;
+BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
+                                 LPARAM l_param) {
+  Vector_Workspace *workspaces = (Vector_Workspace *)l_param;
 
-// void enumerate_root_children(IUIAutomationElement *pRootElement, int depth);
-// void find_all_windows(IUIAutomationElement *pRootElement);
+  Workspace *workspace = malloc(sizeof(Workspace));
+  workspace->monitor = h_monitor;
+  workspace->num = workspaces->size + 1;
 
-// int main()
-// {
-//     SetConsoleOutputCP(CP_UTF8);
-//     _setmode(_fileno(stdout), _O_U16TEXT);
+  workspace_array_add(workspaces, workspace);
 
-//     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
-//     if (hr != S_OK)
-//     {
-//         printf("Failed to initialize COM. Error: %d\n", hr);
-//         return 1;
-//     }
-
-//     hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-//     &IID_IUIAutomation, &g_pAutomation);
-
-//     if (SUCCEEDED(hr) && g_pAutomation != NULL)
-//     {
-//         IUIAutomationElement *pRootElement = NULL;
-
-//         hr = IUIAutomation_GetRootElement(g_pAutomation, &pRootElement);
-
-//         if (SUCCEEDED(hr) && pRootElement != NULL)
-//         {
-//             find_all_windows(pRootElement);
-//             // BSTR bstrName;
-
-//             // hr = IUIAutomationElement_get_CurrentName(pRootElement,
-//             &bstrName);
-//             // if (SUCCEEDED(hr))
-//             // {
-//             //     wprintf(L"Root Element Name: %s\n", bstrName);
-//             //     SysFreeString(bstrName);
-//             // }
-
-//             IUIAutomationElement_Release(pRootElement);
-//         }
-
-//         IUIAutomation_Release(g_pAutomation);
-//     }
-//     else
-//     {
-//         printf("Failed to create CUIAutomation. Error: %d\n, %p", hr,
-//         g_pAutomation);
-//     }
-
-//     CoUninitialize();
-
-//     return 0;
-// }
-
-// void enumerate_root_children(IUIAutomationElement *pRootElement, int depth)
-// {
-//     if (depth > 10)
-//     {
-//         return;
-//     }
-
-//     IUIAutomationTreeWalker *pControlWalker = NULL;
-//     IUIAutomationElement *pNode = NULL;
-
-//     HRESULT hr = IUIAutomation_get_ControlViewWalker(g_pAutomation,
-//     &pControlWalker); if (FAILED(hr) || pControlWalker == NULL)
-//         return;
-
-//     hr = IUIAutomationTreeWalker_GetFirstChildElement(pControlWalker,
-//     pRootElement, &pNode); if (FAILED(hr) || pNode == NULL)
-//     {
-//         IUIAutomationTreeWalker_Release(pControlWalker);
-//         return;
-//     }
-
-//     while (pNode)
-//     {
-//         BSTR desc;
-//         IUIAutomationElement_get_CurrentLocalizedControlType(pNode, &desc);
-//         wprintf(L"%s\n", desc);
-//         SysFreeString(desc);
-
-//         hr = IUIAutomationTreeWalker_GetNextSiblingElement(pControlWalker,
-//         pRootElement, &pNode); if (FAILED(hr) || pNode == NULL)
-//         {
-//             break;
-//         }
-//     }
-
-//     if (pNode != NULL)
-//         IUIAutomationElement_Release(pNode);
-
-//     if (pControlWalker != NULL)
-//         IUIAutomationTreeWalker_Release(pControlWalker);
-// }
-
-// void find_all_windows(IUIAutomationElement *pRootElement)
-// {
-//     IUIAutomationCondition *condition = NULL;
-//     VARIANT var = {.vt = VT_I4, .lVal = UIA_WindowControlTypeId};
-//     HRESULT hr = IUIAutomation_CreatePropertyCondition(g_pAutomation,
-//     UIA_ControlTypePropertyId, var, &condition);
-
-//     if (FAILED(hr) || condition == NULL)
-//         return;
-
-//     IUIAutomationElementArray *windows_array = NULL;
-//     hr = IUIAutomationElement_FindAll(pRootElement, TreeScope_Children,
-//     condition, &windows_array);
-
-//     if (FAILED(hr) || windows_array == NULL)
-//     {
-//         IUIAutomationCondition_Release(condition);
-//         return;
-//     }
-
-//     int count = 0;
-//     IUIAutomationElementArray_get_Length(windows_array, &count);
-//     wprintf(L"Found %d windows\n", count);
-
-//     IUIAutomationElement *window = NULL;
-//     BSTR bstrName;
-
-//     for (size_t i = 0; i < count; i++)
-//     {
-//         window = NULL;
-//         hr = IUIAutomationElementArray_GetElement(windows_array, i, &window);
-
-//         if (FAILED(hr) || window == NULL)
-//         {
-//             break;
-//         }
-
-//         hr = IUIAutomationElement_get_CurrentName(pRootElement, &bstrName);
-//         if (SUCCEEDED(hr))
-//         {
-//             wprintf(L"Window: %s\n", bstrName);
-//         }
-
-//         IUIAutomationElement_Release(window);
-//     }
-
-//     SysFreeString(bstrName);
-//     if (window != NULL)
-//         IUIAutomationElement_Release(window);
-
-//     if (condition != NULL)
-//         IUIAutomationCondition_Release(condition);
-
-//     if (windows_array != NULL)
-//         IUIAutomationElementArray_Release(windows_array);
-// }
+  return TRUE;
+}
