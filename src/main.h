@@ -28,3 +28,4 @@ typedef struct {
 } Wm_params;
 
 #define MAX_EXE_PATH_LENGTH 300
+#define MAX_EXE_NAME_LENGTH 100

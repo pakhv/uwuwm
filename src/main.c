@@ -2,6 +2,7 @@
 
 #include "main.h"
 #include <Windows.h>
+#include <dwmapi.h>
 #include <fcntl.h>
 #include <io.h>
 #include <locale.h>
@@ -47,9 +48,6 @@ void position_windows(Vector_Window *windows) {
 
   for (size_t i = 0; i < windows->size; i++) {
     HWND wnd = windows->data[i].handle;
-    // DWORD p_id = 0;
-    // GetWindowThreadProcessId(wnd, &p_id);
-    // printf("window %zu: %d\n", i, p_id);
 
     if (IsZoomed(wnd)) {
       ShowWindow(wnd, SW_RESTORE);
@@ -111,6 +109,8 @@ void get_process_name_by_window(HWND h_wnd, char *p_name) {
     return;
   }
 
+  CloseHandle(h_p);
+
   extract_exe_name(p_full_path, p_path_l, p_name);
 }
 
@@ -118,21 +118,33 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
   Vector_Window *windows = (Vector_Window *)l_param;
   wchar_t buff[255];
 
-  if (IsWindowVisible(h_wnd)) {
-    Window *window = malloc(sizeof(Window));
-    // HMONITOR monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
-
-    window->handle = h_wnd;
-
-    char *p_name = malloc(sizeof(char) * MAX_EXE_PATH_LENGTH);
-    get_process_name_by_window(h_wnd, p_name);
-
-    window->process_name = p_name;
-
-    printf("%s\n", window->process_name);
-
-    wnd_array_add(windows, window);
+  if (!IsWindowVisible(h_wnd)) {
+    return TRUE;
   }
+
+  LONG_PTR exStyle = GetWindowLongPtr(h_wnd, GWL_EXSTYLE);
+  if (exStyle & WS_EX_TOOLWINDOW) {
+    return TRUE;
+  }
+
+  int cloaked = 0;
+  HRESULT hr =
+      DwmGetWindowAttribute(h_wnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+  if (SUCCEEDED(hr) && cloaked != 0) {
+    return TRUE;
+  }
+
+  Window *window = malloc(sizeof(Window));
+  window->handle = h_wnd;
+  // HMONITOR monitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+
+  char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
+  get_process_name_by_window(h_wnd, p_name);
+  window->process_name = p_name;
+
+  printf("%s\n", window->process_name);
+
+  wnd_array_add(windows, window);
 
   return TRUE;
 }

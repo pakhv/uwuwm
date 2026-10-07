@@ -13,7 +13,8 @@
                 "/link",
                 "ole32.lib",
                 "oleaut32.lib",
-                "User32.lib"
+                "User32.lib",
+                "Dwmapi.lib"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
