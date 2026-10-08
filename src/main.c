@@ -9,11 +9,14 @@
 #include <stdio.h>
 #include <uiautomation.h>
 
-void wnd_array_add(Vector_Window *arr, Window *handle);
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
-void position_windows(Vector_Window *arr);
+void position_windows(Wm_params *wm_params, size_t workspace_num);
+Vector_Window *get_workspace_windows(Vector_Window *windows,
+                                     size_t workspace_num);
+void workspace_array_add(Vector_Workspace *arr, Workspace *el);
+void wnd_array_add(Vector_Window *arr, Window *el);
 
 void init(Wm_params *wm_params) {
   wm_params->active_workspace = 1;
@@ -37,31 +40,60 @@ void main(void) {
   printf("Windows num: %zu\n", windows->size);
   printf("Workspaces num: %zu\n", wm_params.workspaces->size);
 
-  position_windows(windows);
+  position_windows(&wm_params, wm_params.active_workspace);
 
-  free(windows);
+  FREE_VECTOR(wm_params.windows)
+  FREE_VECTOR(wm_params.workspaces)
+
   free(wm_params.workspaces);
 }
 
-void position_windows(Vector_Window *windows) {
-  HDWP hdwp = BeginDeferWindowPos(windows->size);
-  if (hdwp == NULL) {
-    printf("Failed\n");
+void position_windows(Wm_params *wm_params, size_t workspace_num) {
+  Vector_Window *w_windows =
+      get_workspace_windows(wm_params->windows, workspace_num);
+
+  if (w_windows->size == 0) {
+    printf("No windows to position for workspace %zu", workspace_num);
+    free(w_windows);
     return;
   }
 
-  for (size_t i = 0; i < windows->size; i++) {
-    HWND wnd = windows->data[i].handle;
+  HMONITOR monitor = w_windows->data[0]->workspace->monitor;
+  MONITORINFO m_info = {.cbSize = sizeof(MONITORINFO)};
+
+  if (!GetMonitorInfo(monitor, &m_info)) {
+    printf("Failed to retrieve information about monitor for workspace %zu",
+           workspace_num);
+    free(w_windows);
+    return;
+  }
+
+  HDWP hdwp = BeginDeferWindowPos(w_windows->size);
+  if (hdwp == NULL) {
+    printf("Failed to position windows for workspace %zu\n", workspace_num);
+    free(w_windows);
+    return;
+  }
+
+  size_t wnd_width =
+      (m_info.rcWork.right - m_info.rcWork.left) / w_windows->size;
+  size_t wnd_height = m_info.rcWork.bottom - m_info.rcWork.top;
+
+  printf("Monitor width: %zu height: %zu\n", wnd_width, wnd_height);
+
+  for (size_t i = 0; i < w_windows->size; i++) {
+    HWND wnd = w_windows->data[i]->handle;
 
     if (IsZoomed(wnd)) {
       ShowWindow(wnd, SW_RESTORE);
     }
 
-    HDWP def_hdpw = DeferWindowPos(hdwp, wnd, NULL, 10, 10, 400, 400,
-                                   SWP_NOZORDER | SWP_NOACTIVATE);
+    HDWP def_hdpw = DeferWindowPos(hdwp, wnd, NULL, i * wnd_width, 0, wnd_width,
+                                   wnd_height, SWP_NOZORDER | SWP_NOACTIVATE);
 
     if (def_hdpw == NULL) {
       printf("Failed: %lu\n", GetLastError());
+      free(w_windows);
       return;
     }
   }
@@ -69,25 +101,41 @@ void position_windows(Vector_Window *windows) {
   if (!EndDeferWindowPos(hdwp)) {
     printf("Failed\n");
   }
+
+  free(w_windows);
+}
+
+Vector_Window *get_workspace_windows(Vector_Window *windows,
+                                     size_t workspace_num) {
+  Vector_Window *w_windows = malloc(sizeof(Vector_Window));
+  INIT_VECTOR(w_windows)
+
+  for (size_t i = 0; i < windows->size; i++) {
+    if (windows->data[i]->workspace->num == workspace_num) {
+      wnd_array_add(w_windows, windows->data[i]);
+    }
+  }
+
+  return w_windows;
 }
 
 void workspace_array_add(Vector_Workspace *arr, Workspace *el) {
   if (arr->capacity <= arr->size) {
     arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace));
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace *));
   }
 
-  arr->data[arr->size] = *el;
+  arr->data[arr->size] = el;
   arr->size += 1;
 }
 
 void wnd_array_add(Vector_Window *arr, Window *el) {
   if (arr->capacity <= arr->size) {
     arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Window));
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Window *));
   }
 
-  arr->data[arr->size] = *el;
+  arr->data[arr->size] = el;
   arr->size += 1;
 }
 
@@ -149,17 +197,17 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
   }
 
   Window *window = malloc(sizeof(Window));
+  wnd_array_add(windows, window);
+
   window->handle = h_wnd;
   // assigning first workspace to all windows
-  window->workspace = &wm_params->workspaces->data[0];
+  window->workspace = wm_params->workspaces->data[0];
 
   char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
   get_process_name_by_window(h_wnd, p_name);
   window->process_name = p_name;
 
   printf("%s\n", window->process_name);
-
-  wnd_array_add(windows, window);
 
   return TRUE;
 }
@@ -169,10 +217,10 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
   Vector_Workspace *workspaces = (Vector_Workspace *)l_param;
 
   Workspace *workspace = malloc(sizeof(Workspace));
-  workspace->monitor = h_monitor;
-  workspace->num = workspaces->size + 1;
-
   workspace_array_add(workspaces, workspace);
+
+  workspace->monitor = h_monitor;
+  workspace->num = workspaces->size;
 
   return TRUE;
 }

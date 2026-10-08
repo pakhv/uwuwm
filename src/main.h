@@ -3,7 +3,7 @@
 
 #define DEFINE_VECTOR(T)                                                       \
   typedef struct {                                                             \
-    T *data;                                                                   \
+    T **data;                                                                  \
     size_t size;                                                               \
     size_t capacity;                                                           \
   } Vector_##T;
@@ -13,6 +13,17 @@
     p->size = 0;                                                               \
     p->capacity = 0;                                                           \
     p->data = NULL;                                                            \
+  } while (0);
+
+#define FREE_VECTOR(p)                                                         \
+  do {                                                                         \
+    for (size_t i = 0; i < p->size; i++) {                                     \
+      free(p->data[i]);                                                        \
+    }                                                                          \
+                                                                               \
+    free(p->data);                                                             \
+    p->size = 0;                                                               \
+    p->capacity = 0;                                                           \
   } while (0);
 
 typedef struct {
