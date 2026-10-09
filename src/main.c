@@ -15,6 +15,7 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
 void position_windows(Wm_params *wm_params, size_t workspace_num);
 Vector_Window *get_workspace_windows_to_position(Vector_Window *windows,
                                                  size_t workspace_num);
+BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i);
 void workspace_array_add(Vector_Workspace *arr, Workspace *el);
 void wnd_array_add(Vector_Window *arr, Window *el);
 
@@ -49,69 +50,57 @@ void main(void) {
 }
 
 void position_windows(Wm_params *wm_params, size_t workspace_num) {
-  Vector_Window *w_windows =
+  Vector_Window *v_windows =
       get_workspace_windows_to_position(wm_params->windows, workspace_num);
 
-  if (w_windows->size == 0) {
+  if (v_windows->size == 0) {
     printf("No windows to position for workspace %zu", workspace_num);
-    free(w_windows);
+    free(v_windows);
     return;
   }
 
-  HMONITOR monitor = w_windows->data[0]->workspace->monitor;
+  HMONITOR monitor = v_windows->data[0]->workspace->monitor;
   MONITORINFO m_info = {.cbSize = sizeof(MONITORINFO)};
 
   if (!GetMonitorInfo(monitor, &m_info)) {
     printf("Failed to retrieve information about monitor for workspace %zu",
            workspace_num);
-    free(w_windows);
+    free(v_windows);
     return;
   }
 
-  HDWP hdwp = BeginDeferWindowPos(w_windows->size);
+  HDWP hdwp = BeginDeferWindowPos(v_windows->size);
   if (hdwp == NULL) {
     printf("Failed to position windows for workspace %zu\n", workspace_num);
-    free(w_windows);
+    free(v_windows);
     return;
   }
 
-  size_t wnd_width =
-      (m_info.rcMonitor.right - m_info.rcMonitor.left) / w_windows->size;
-  size_t wnd_height = m_info.rcWork.bottom - m_info.rcWork.top;
+  size_t w_width =
+      (m_info.rcMonitor.right - m_info.rcMonitor.left) / v_windows->size;
+  size_t w_height = m_info.rcWork.bottom - m_info.rcWork.top;
 
-  printf("Monitor width: %lu height: %lu; window width: %zu height: %zu \n",
-         m_info.rcMonitor.right - m_info.rcMonitor.left,
-         m_info.rcMonitor.bottom - m_info.rcMonitor.top, wnd_width, wnd_height);
+  for (size_t i = 0; i < v_windows->size; i++) {
+    HWND window = v_windows->data[i]->handle;
 
-  for (size_t i = 0; i < w_windows->size; i++) {
-    HWND wnd = w_windows->data[i]->handle;
-
-    if (IsZoomed(wnd)) {
-      ShowWindow(wnd, SW_RESTORE);
+    if (IsZoomed(window)) {
+      ShowWindow(window, SW_RESTORE);
     }
 
-    RECT w_g_rect = {0};
-    if (FAILED(DwmGetWindowAttribute(wnd, DWMWA_EXTENDED_FRAME_BOUNDS,
-                                     &w_g_rect, sizeof(RECT)))) {
-      printf("Failed to get window gaps %s", w_windows->data[i]->process_name);
-      continue;
+    POINT top_left_point = {.x = m_info.rcWork.left, .y = m_info.rcWork.top};
+    SIZE w_size = {.cx = w_width, .cy = w_height};
+    if (!get_window_position(window, &top_left_point, &w_size, i)) {
+      printf("Failed to get window gaps %s", v_windows->data[i]->process_name);
     }
 
-    RECT w_rect = {0};
-    GetWindowRect(wnd, &w_rect);
-
-    int gap_x = w_g_rect.left - w_rect.left;
-    int gap_y = w_rect.bottom - w_g_rect.bottom;
-
-    HDWP def_hdpw = DeferWindowPos(hdwp, wnd, NULL,
-                                   m_info.rcWork.left + i * wnd_width - gap_x,
-                                   0, wnd_width + 2 * gap_x, wnd_height + gap_y,
-                                   SWP_NOZORDER | SWP_NOACTIVATE);
+    HDWP def_hdpw =
+        DeferWindowPos(hdwp, window, NULL, top_left_point.x, top_left_point.y,
+                       w_size.cx, w_size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
 
     if (def_hdpw == NULL) {
       printf("Failed to position windows for workspace %zu\n: %lu",
              workspace_num, GetLastError());
-      free(w_windows);
+      free(v_windows);
       return;
     }
   }
@@ -120,7 +109,28 @@ void position_windows(Wm_params *wm_params, size_t workspace_num) {
     printf("Failed\n");
   }
 
-  free(w_windows);
+  free(v_windows);
+}
+
+BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size,
+                         size_t i) {
+  RECT w_g_rect = {0};
+  if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS,
+                                   &w_g_rect, sizeof(RECT)))) {
+    return FALSE;
+  }
+
+  RECT w_rect = {0};
+  GetWindowRect(window, &w_rect);
+
+  int gap_x = w_g_rect.left - w_rect.left;
+  int gap_y = w_rect.bottom - w_g_rect.bottom;
+
+  n_point->x += i * n_size->cx - gap_x;
+  n_size->cx += 2 * gap_x;
+  n_size->cy += gap_y;
+
+  return TRUE;
 }
 
 Vector_Window *get_workspace_windows_to_position(Vector_Window *windows,
@@ -136,26 +146,6 @@ Vector_Window *get_workspace_windows_to_position(Vector_Window *windows,
   }
 
   return w_windows;
-}
-
-void workspace_array_add(Vector_Workspace *arr, Workspace *el) {
-  if (arr->capacity <= arr->size) {
-    arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace *));
-  }
-
-  arr->data[arr->size] = el;
-  arr->size += 1;
-}
-
-void wnd_array_add(Vector_Window *arr, Window *el) {
-  if (arr->capacity <= arr->size) {
-    arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Window *));
-  }
-
-  arr->data[arr->size] = el;
-  arr->size += 1;
 }
 
 void extract_exe_name(char *path, DWORD p_l, char *name) {
@@ -242,4 +232,24 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
   workspace->num = workspaces->size;
 
   return TRUE;
+}
+
+void workspace_array_add(Vector_Workspace *arr, Workspace *el) {
+  if (arr->capacity <= arr->size) {
+    arr->capacity = 2 * (arr->size + 1);
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace *));
+  }
+
+  arr->data[arr->size] = el;
+  arr->size += 1;
+}
+
+void wnd_array_add(Vector_Window *arr, Window *el) {
+  if (arr->capacity <= arr->size) {
+    arr->capacity = 2 * (arr->size + 1);
+    arr->data = realloc(arr->data, arr->capacity * sizeof(Window *));
+  }
+
+  arr->data[arr->size] = el;
+  arr->size += 1;
 }
