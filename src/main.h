@@ -26,6 +26,8 @@
     p->capacity = 0;                                                           \
   } while (0);
 
+#define HEDDEN_WINDOW_X -3900
+
 typedef struct {
   size_t num;
   HMONITOR monitor;

@@ -13,9 +13,13 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
 void position_windows(Wm_params *wm_params, size_t workspace_num);
-Vector_Window *get_workspace_windows_to_position(Vector_Window *windows,
-                                                 size_t workspace_num);
-BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i);
+void get_workspace_windows_to_position(Vector_Window *windows,
+                                       size_t workspace_num,
+                                       Vector_Window *v_windows,
+                                       Vector_Window *h_windows);
+BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i,
+                         BOOL set_wh);
+BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows, LPRECT m_rect);
 void workspace_array_add(Vector_Workspace *arr, Workspace *el);
 void wnd_array_add(Vector_Window *arr, Window *el);
 
@@ -50,13 +54,18 @@ void main(void) {
 }
 
 void position_windows(Wm_params *wm_params, size_t workspace_num) {
-  Vector_Window *v_windows =
-      get_workspace_windows_to_position(wm_params->windows, workspace_num);
+  Vector_Window *v_windows = malloc(sizeof(Vector_Window));
+  Vector_Window *h_windows = malloc(sizeof(Vector_Window));
 
-  if (v_windows->size == 0) {
+  INIT_VECTOR(v_windows)
+  INIT_VECTOR(h_windows)
+
+  get_workspace_windows_to_position(wm_params->windows, workspace_num,
+                                    v_windows, h_windows);
+
+  if (v_windows->size == 0 && h_windows->size == 0) {
     printf("No windows to position for workspace %zu", workspace_num);
-    free(v_windows);
-    return;
+    goto Cleanup;
   }
 
   HMONITOR monitor = v_windows->data[0]->workspace->monitor;
@@ -65,32 +74,65 @@ void position_windows(Wm_params *wm_params, size_t workspace_num) {
   if (!GetMonitorInfo(monitor, &m_info)) {
     printf("Failed to retrieve information about monitor for workspace %zu",
            workspace_num);
-    free(v_windows);
-    return;
+    goto Cleanup;
   }
 
   HDWP hdwp = BeginDeferWindowPos(v_windows->size);
   if (hdwp == NULL) {
     printf("Failed to position windows for workspace %zu\n", workspace_num);
-    free(v_windows);
-    return;
+    goto Cleanup;
   }
 
-  size_t w_width =
-      (m_info.rcMonitor.right - m_info.rcMonitor.left) / v_windows->size;
-  size_t w_height = m_info.rcWork.bottom - m_info.rcWork.top;
+  if (!position_monitor_windows(hdwp, v_windows, &m_info.rcWork)) {
+    printf("Failed to position windows for workspace %zu:\n%lu\n",
+           workspace_num, GetLastError());
+    goto Cleanup;
+  }
 
-  for (size_t i = 0; i < v_windows->size; i++) {
-    HWND window = v_windows->data[i]->handle;
+  if (!position_monitor_windows(hdwp, h_windows, NULL)) {
+    printf("Failed to position windows for workspace %zu:\n%lu\n",
+           workspace_num, GetLastError());
+    goto Cleanup;
+  }
+
+  if (!EndDeferWindowPos(hdwp)) {
+    printf("Failed to position windows for workspace %zu\n", workspace_num);
+  }
+
+Cleanup:
+  free(v_windows);
+  free(h_windows);
+}
+
+BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows,
+                              LPRECT m_rect) {
+  if (windows->size == 0) {
+    return TRUE;
+  }
+
+  RECT b_rect = {
+      .left = HEDDEN_WINDOW_X, .right = HEDDEN_WINDOW_X, .bottom = 0, .top = 0};
+
+  if (m_rect != NULL) {
+    b_rect = *m_rect;
+  }
+
+  size_t w_width = (b_rect.right - b_rect.left) / windows->size;
+  size_t w_height = b_rect.bottom - b_rect.top;
+
+  for (size_t i = 0; i < windows->size; i++) {
+    HWND window = windows->data[i]->handle;
 
     if (IsZoomed(window)) {
       ShowWindow(window, SW_RESTORE);
     }
 
-    POINT top_left_point = {.x = m_info.rcWork.left, .y = m_info.rcWork.top};
+    POINT top_left_point = {.x = b_rect.left, .y = b_rect.top};
     SIZE w_size = {.cx = w_width, .cy = w_height};
-    if (!get_window_position(window, &top_left_point, &w_size, i)) {
-      printf("Failed to get window gaps %s", v_windows->data[i]->process_name);
+    if (!get_window_position(window, &top_left_point, &w_size, i,
+                             m_rect == NULL)) {
+      printf("Failed to get window gaps %s", windows->data[i]->process_name);
+      continue;
     }
 
     HDWP def_hdpw =
@@ -98,22 +140,15 @@ void position_windows(Wm_params *wm_params, size_t workspace_num) {
                        w_size.cx, w_size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
 
     if (def_hdpw == NULL) {
-      printf("Failed to position windows for workspace %zu\n: %lu",
-             workspace_num, GetLastError());
-      free(v_windows);
-      return;
+      return FALSE;
     }
   }
 
-  if (!EndDeferWindowPos(hdwp)) {
-    printf("Failed\n");
-  }
-
-  free(v_windows);
+  return TRUE;
 }
 
-BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size,
-                         size_t i) {
+BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i,
+                         BOOL set_wh) {
   RECT w_g_rect = {0};
   if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS,
                                    &w_g_rect, sizeof(RECT)))) {
@@ -122,6 +157,12 @@ BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size,
 
   RECT w_rect = {0};
   GetWindowRect(window, &w_rect);
+
+  if (set_wh) {
+    n_size->cx = w_rect.right - w_rect.left;
+    n_size->cy = w_rect.bottom - w_rect.top;
+    return TRUE;
+  }
 
   int gap_x = w_g_rect.left - w_rect.left;
   int gap_y = w_rect.bottom - w_g_rect.bottom;
@@ -133,19 +174,23 @@ BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size,
   return TRUE;
 }
 
-Vector_Window *get_workspace_windows_to_position(Vector_Window *windows,
-                                                 size_t workspace_num) {
-  Vector_Window *w_windows = malloc(sizeof(Vector_Window));
-  INIT_VECTOR(w_windows)
+void get_workspace_windows_to_position(Vector_Window *windows,
+                                       size_t workspace_num,
+                                       Vector_Window *v_windows,
+                                       Vector_Window *h_windows) {
 
   for (size_t i = 0; i < windows->size; i++) {
-    if (windows->data[i]->workspace->num == workspace_num &&
-        !IsIconic(windows->data[i]->handle)) {
-      wnd_array_add(w_windows, windows->data[i]);
+    if (IsIconic(windows->data[i]->handle)) {
+      continue;
+    }
+
+    if (windows->data[i]->workspace->num == workspace_num) {
+      wnd_array_add(v_windows, windows->data[i]);
+    } else {
+      // maybe filter windows that are already "hidden" out
+      wnd_array_add(h_windows, windows->data[i]);
     }
   }
-
-  return w_windows;
 }
 
 void extract_exe_name(char *path, DWORD p_l, char *name) {
