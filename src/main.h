@@ -26,7 +26,7 @@
     p->capacity = 0;                                                           \
   } while (0);
 
-#define HEDDEN_WINDOW_X -3900
+#define HIDDEN_WINDOW_X -3900
 
 typedef struct {
   size_t num;
@@ -37,6 +37,7 @@ typedef struct {
   HWND handle;
   char *process_name;
   Workspace *workspace;
+  RECT w_rect;
 } Window;
 
 DEFINE_VECTOR(Window)
@@ -50,3 +51,6 @@ typedef struct {
 
 #define MAX_EXE_PATH_LENGTH 300
 #define MAX_EXE_NAME_LENGTH 100
+
+#define WP_INIT 0x0001
+#define WP_HIDDEN 0x0002

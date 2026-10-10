@@ -17,9 +17,9 @@ void get_workspace_windows_to_position(Vector_Window *windows,
                                        size_t workspace_num,
                                        Vector_Window *v_windows,
                                        Vector_Window *h_windows);
-BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i,
-                         BOOL set_wh);
-BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows, LPRECT m_rect);
+BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows, LPRECT m_rect,
+                              int flags);
+BOOL map_to_window_coords(HWND window, LPRECT t_rect);
 void workspace_array_add(Vector_Workspace *arr, Workspace *el);
 void wnd_array_add(Vector_Window *arr, Window *el);
 
@@ -83,15 +83,16 @@ void position_windows(Wm_params *wm_params, size_t workspace_num) {
     goto Cleanup;
   }
 
-  if (!position_monitor_windows(hdwp, v_windows, &m_info.rcWork)) {
-    printf("Failed to position windows for workspace %zu:\n%lu\n",
-           workspace_num, GetLastError());
+  if (!position_monitor_windows(hdwp, v_windows, &m_info.rcWork, WP_INIT)) {
+    printf("Failed to position visible windows for workspace %zu:\n",
+           workspace_num);
     goto Cleanup;
   }
 
-  if (!position_monitor_windows(hdwp, h_windows, NULL)) {
-    printf("Failed to position windows for workspace %zu:\n%lu\n",
-           workspace_num, GetLastError());
+  if (!position_monitor_windows(hdwp, h_windows, &m_info.rcWork,
+                                WP_INIT | WP_HIDDEN)) {
+    printf("Failed to position hidden windows for workspace %zu:\n",
+           workspace_num);
     goto Cleanup;
   }
 
@@ -104,21 +105,17 @@ Cleanup:
   free(h_windows);
 }
 
-BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows,
-                              LPRECT m_rect) {
+BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows, LPRECT m_rect,
+                              int flags) {
   if (windows->size == 0) {
     return TRUE;
   }
 
-  RECT b_rect = {
-      .left = HEDDEN_WINDOW_X, .right = HEDDEN_WINDOW_X, .bottom = 0, .top = 0};
+  size_t w_width = (m_rect->right - m_rect->left) / windows->size;
+  size_t w_height = m_rect->bottom - m_rect->top;
 
-  if (m_rect != NULL) {
-    b_rect = *m_rect;
-  }
-
-  size_t w_width = (b_rect.right - b_rect.left) / windows->size;
-  size_t w_height = b_rect.bottom - b_rect.top;
+  BOOL is_init = flags & WP_INIT;
+  BOOL is_hidden = flags & WP_HIDDEN;
 
   for (size_t i = 0; i < windows->size; i++) {
     HWND window = windows->data[i]->handle;
@@ -127,17 +124,39 @@ BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows,
       ShowWindow(window, SW_RESTORE);
     }
 
-    POINT top_left_point = {.x = b_rect.left, .y = b_rect.top};
-    SIZE w_size = {.cx = w_width, .cy = w_height};
-    if (!get_window_position(window, &top_left_point, &w_size, i,
-                             m_rect == NULL)) {
-      printf("Failed to get window gaps %s", windows->data[i]->process_name);
-      continue;
+    RECT position = {0};
+    if (is_init && !is_hidden) {
+      position.left = m_rect->left + i * w_width;
+      position.right = m_rect->left + (i + 1) * w_width;
+      position.top = m_rect->top;
+      position.bottom = m_rect->bottom;
+    } else {
+      position = windows->data[i]->w_rect;
     }
 
-    HDWP def_hdpw =
-        DeferWindowPos(hdwp, window, NULL, top_left_point.x, top_left_point.y,
-                       w_size.cx, w_size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+    if (is_hidden) {
+      position.left = HIDDEN_WINDOW_X;
+      position.right = HIDDEN_WINDOW_X + w_width;
+    }
+
+    if (is_init) {
+      if (!map_to_window_coords(window, &position)) {
+        printf("Failed to get window gaps %s", windows->data[i]->process_name);
+        continue;
+      }
+    }
+
+    if (is_init && !is_hidden) {
+      windows->data[i]->w_rect = position;
+    }
+
+    printf("%d %d %d %d\n", position.left, position.right, position.top,
+           position.bottom);
+
+    HDWP def_hdpw = DeferWindowPos(hdwp, window, NULL, position.left,
+                                   position.top, position.right - position.left,
+                                   position.bottom - position.top,
+                                   SWP_NOZORDER | SWP_NOACTIVATE);
 
     if (def_hdpw == NULL) {
       return FALSE;
@@ -147,29 +166,27 @@ BOOL position_monitor_windows(HDWP hdwp, Vector_Window *windows,
   return TRUE;
 }
 
-BOOL get_window_position(HWND window, LPPOINT n_point, LPSIZE n_size, size_t i,
-                         BOOL set_wh) {
-  RECT w_g_rect = {0};
+BOOL map_to_window_coords(HWND window, LPRECT t_rect) {
+  RECT real_w_rect = {0};
   if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS,
-                                   &w_g_rect, sizeof(RECT)))) {
+                                   &real_w_rect, sizeof(RECT)))) {
     return FALSE;
   }
 
   RECT w_rect = {0};
-  GetWindowRect(window, &w_rect);
-
-  if (set_wh) {
-    n_size->cx = w_rect.right - w_rect.left;
-    n_size->cy = w_rect.bottom - w_rect.top;
-    return TRUE;
+  if (!GetWindowRect(window, &w_rect)) {
+    return FALSE;
   }
 
-  int gap_x = w_g_rect.left - w_rect.left;
-  int gap_y = w_rect.bottom - w_g_rect.bottom;
+  int l_gap = real_w_rect.left - w_rect.left;
+  int r_gap = w_rect.right - real_w_rect.right;
+  int t_gap = real_w_rect.top - w_rect.top;
+  int b_gap = w_rect.bottom - real_w_rect.bottom;
 
-  n_point->x += i * n_size->cx - gap_x;
-  n_size->cx += 2 * gap_x;
-  n_size->cy += gap_y;
+  t_rect->left -= l_gap;
+  t_rect->right += r_gap;
+  t_rect->top -= t_gap;
+  t_rect->bottom += b_gap;
 
   return TRUE;
 }
