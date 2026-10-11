@@ -52,5 +52,6 @@ typedef struct {
 #define MAX_EXE_PATH_LENGTH 300
 #define MAX_EXE_NAME_LENGTH 100
 
+#define WP_NONE 0x0000
 #define WP_INIT 0x0001
 #define WP_HIDDEN 0x0002
