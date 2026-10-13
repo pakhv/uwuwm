@@ -28,30 +28,26 @@
 
 #define HIDDEN_WINDOW_X -3900
 
-typedef struct {
-  size_t num;
-  HMONITOR monitor;
-} Workspace;
+#define MAX_EXE_PATH_LENGTH 300
+#define MAX_EXE_NAME_LENGTH 100
 
 typedef struct {
   HWND handle;
   char *process_name;
-  Workspace *workspace;
   RECT w_rect;
 } Window;
 
 DEFINE_VECTOR(Window)
+
+typedef struct {
+  size_t num;
+  HMONITOR monitor;
+  Vector_Window *windows;
+} Workspace;
+
 DEFINE_VECTOR(Workspace)
 
 typedef struct {
   size_t active_workspace;
-  Vector_Window *windows;
   Vector_Workspace *workspaces;
 } Wm_params;
-
-#define MAX_EXE_PATH_LENGTH 300
-#define MAX_EXE_NAME_LENGTH 100
-
-#define WP_NONE 0x0000
-#define WP_INIT 0x0001
-#define WP_HIDDEN 0x0002
