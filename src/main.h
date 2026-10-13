@@ -1,6 +1,9 @@
 #include <Windows.h>
 #include <stdio.h>
 
+#ifndef STRUCTS_H
+#define STRUCTS_H
+
 #define DEFINE_VECTOR(T)                                                       \
   typedef struct {                                                             \
     T **data;                                                                  \
@@ -51,3 +54,5 @@ typedef struct {
   size_t active_workspace;
   Vector_Workspace *workspaces;
 } Wm_params;
+
+#endif

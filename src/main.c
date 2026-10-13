@@ -1,13 +1,11 @@
-#define COBJMACROS
-
 #include "main.h"
+#include "eventloop.h"
 #include <Windows.h>
 #include <dwmapi.h>
 #include <fcntl.h>
 #include <io.h>
 #include <locale.h>
 #include <stdio.h>
-#include <uiautomation.h>
 
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
@@ -55,6 +53,8 @@ void main(void) {
 
   calculate_windows_init(&wm_params);
   position_windows_init(&wm_params);
+
+  start_events_loop(&wm_params);
 
   cleanup(&wm_params);
 }
