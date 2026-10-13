@@ -1,5 +1,5 @@
-#include "main.h"
 #include "eventloop.h"
+#include "structs.h"
 #include <Windows.h>
 #include <dwmapi.h>
 #include <fcntl.h>

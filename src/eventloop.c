@@ -1,6 +1,6 @@
 #define COBJMACROS
 
-#include "main.h"
+#include "structs.h"
 #include <stdio.h>
 #include <uiautomation.h>
 #include <windows.h>

@@ -1,4 +1,4 @@
-#include "main.h"
+#include "structs.h"
 
 #ifndef EVENT_LOOP_H
 #define EVENT_LOOP_H
