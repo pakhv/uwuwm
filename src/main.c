@@ -1,11 +1,5 @@
 #include "eventloop.h"
-#include "structs.h"
-#include <Windows.h>
 #include <dwmapi.h>
-#include <fcntl.h>
-#include <io.h>
-#include <locale.h>
-#include <stdio.h>
 
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,

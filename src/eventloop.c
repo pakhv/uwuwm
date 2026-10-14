@@ -1,17 +1,110 @@
 #define COBJMACROS
 
 #include "structs.h"
-#include <stdio.h>
 #include <uiautomation.h>
-#include <windows.h>
-
-static HWND g_hidden_wnd = NULL;
 
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
   LONG ref_count;
   Wm_params *wm_params;
 } WindowsEventHandler;
+
+STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
+                                         REFIID riid, void **ppv_object);
+STDMETHODIMP_(ULONG) EventHandler_AddRef(IUIAutomationEventHandler *this);
+STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *this);
+STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
+                                                IUIAutomationElement *sender,
+                                                EVENTID event_id);
+
+BOOL WINAPI exit_handler(DWORD c_type);
+LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
+                                    LPARAM l_param);
+
+void create_hidden_window(WNDCLASSEX *wc);
+
+static IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
+    EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
+    EventHandler_HandleAutomationEvent};
+static HWND g_hidden_wnd = NULL;
+
+void register_windows_event_handler(IUIAutomation *ui_automation,
+                                    IUIAutomationElement *root_el,
+                                    Wm_params *wm_params) {
+  WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
+                                 .ref_count = 1,
+                                 .wm_params = wm_params};
+  IUIAutomationEventHandler *ph_interface =
+      (IUIAutomationEventHandler *)&handler;
+
+  HRESULT hr = IUIAutomation_AddAutomationEventHandler(
+      ui_automation, UIA_Window_WindowOpenedEventId, root_el, TreeScope_Subtree,
+      NULL, ph_interface);
+
+  MSG msg = {0};
+  BOOL m_ret;
+
+  if (SUCCEEDED(hr)) {
+
+    while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
+      if (msg.message == WM_QUIT) {
+        break;
+      }
+      if (m_ret == -1) {
+        break;
+      } else {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+      }
+    }
+
+    IUIAutomation_RemoveAutomationEventHandler(
+        ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
+  } else {
+    printf("Failed to register handler\n");
+  }
+}
+
+void start_events_loop(Wm_params *wm_params) {
+  HRESULT hr;
+  IUIAutomationElement *root_el = NULL;
+  WNDCLASSEX wc = {0};
+
+  create_hidden_window(&wc);
+
+  if (!SetConsoleCtrlHandler(exit_handler, TRUE)) {
+    printf("Could not set control handler\n");
+    return;
+  }
+
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
+  IUIAutomation *ui_utomation = NULL;
+  hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_IUIAutomation, &ui_utomation);
+
+  if (FAILED(hr) || ui_utomation == NULL) {
+    goto Cleanup;
+  }
+
+  hr = IUIAutomation_GetRootElement(ui_utomation, &root_el);
+  if (FAILED(hr) || root_el == NULL) {
+    goto Cleanup;
+  }
+
+  register_windows_event_handler(ui_utomation, root_el, wm_params);
+
+Cleanup:
+  if (ui_utomation != NULL) {
+    hr = IUIAutomation_RemoveAllEventHandlers(ui_utomation);
+    if (FAILED(hr))
+      IUIAutomation_Release(ui_utomation);
+  }
+
+  if (root_el != NULL)
+    IUIAutomationElement_Release(root_el);
+
+  CoUninitialize();
+}
 
 STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
                                          REFIID riid, void **ppv_object) {
@@ -59,47 +152,6 @@ BOOL WINAPI exit_handler(DWORD c_type) {
   return FALSE;
 }
 
-static IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
-    EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
-    EventHandler_HandleAutomationEvent};
-
-void register_windows_event_handler(IUIAutomation *ui_automation,
-                                    IUIAutomationElement *root_el,
-                                    Wm_params *wm_params) {
-  WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
-                                 .ref_count = 1,
-                                 .wm_params = wm_params};
-  IUIAutomationEventHandler *ph_interface =
-      (IUIAutomationEventHandler *)&handler;
-
-  HRESULT hr = IUIAutomation_AddAutomationEventHandler(
-      ui_automation, UIA_Window_WindowOpenedEventId, root_el, TreeScope_Subtree,
-      NULL, ph_interface);
-
-  MSG msg = {0};
-  BOOL m_ret;
-
-  if (SUCCEEDED(hr)) {
-
-    while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
-      if (msg.message == WM_QUIT) {
-        break;
-      }
-      if (m_ret == -1) {
-        break;
-      } else {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-      }
-    }
-
-    IUIAutomation_RemoveAutomationEventHandler(
-        ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
-  } else {
-    printf("Failed to register handler\n");
-  }
-}
-
 LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
                                     LPARAM l_param) {
   switch (msg) {
@@ -120,45 +172,4 @@ void create_hidden_window(WNDCLASSEX *wc) {
 
   g_hidden_wnd = CreateWindowEx(0, wc->lpszClassName, NULL, 0, 0, 0, 0, 0,
                                 HWND_MESSAGE, NULL, wc->hInstance, NULL);
-}
-
-void start_events_loop(Wm_params *wm_params) {
-  HRESULT hr;
-  IUIAutomationElement *root_el = NULL;
-  WNDCLASSEX wc = {0};
-
-  create_hidden_window(&wc);
-
-  if (!SetConsoleCtrlHandler(exit_handler, TRUE)) {
-    printf("Could not set control handler\n");
-    return;
-  }
-
-  CoInitializeEx(NULL, COINIT_MULTITHREADED);
-  IUIAutomation *ui_utomation = NULL;
-  hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-                        &IID_IUIAutomation, &ui_utomation);
-
-  if (FAILED(hr) || ui_utomation == NULL) {
-    goto Cleanup;
-  }
-
-  hr = IUIAutomation_GetRootElement(ui_utomation, &root_el);
-  if (FAILED(hr) || root_el == NULL) {
-    goto Cleanup;
-  }
-
-  register_windows_event_handler(ui_utomation, root_el, wm_params);
-
-Cleanup:
-  if (ui_utomation != NULL) {
-    hr = IUIAutomation_RemoveAllEventHandlers(ui_utomation);
-    if (FAILED(hr))
-      IUIAutomation_Release(ui_utomation);
-  }
-
-  if (root_el != NULL)
-    IUIAutomationElement_Release(root_el);
-
-  CoUninitialize();
 }
