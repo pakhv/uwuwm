@@ -36,8 +36,8 @@ void init(Wm_params *wm_params) {
 }
 
 void cleanup(Wm_params *wm_params) {
-  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
-    FREE_VECTOR(wm_params->workspaces->data[i]->windows)
+  for (size_t j = 0; j < wm_params->workspaces->size; j++) {
+    FREE_VECTOR(wm_params->workspaces->data[j]->windows)
   }
 
   FREE_VECTOR(wm_params->workspaces)

@@ -5,6 +5,8 @@
 #include <uiautomation.h>
 #include <windows.h>
 
+static HWND g_hidden_wnd = NULL;
+
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
   LONG ref_count;
@@ -47,6 +49,16 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
   return S_OK;
 }
 
+BOOL WINAPI exit_handler(DWORD c_type) {
+  if ((c_type == CTRL_C_EVENT || c_type == CTRL_CLOSE_EVENT) &&
+      g_hidden_wnd != NULL) {
+    PostMessage(g_hidden_wnd, WM_CLOSE, 0, 0);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
 static IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
     EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
     EventHandler_HandleAutomationEvent};
@@ -64,13 +76,15 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
       ui_automation, UIA_Window_WindowOpenedEventId, root_el, TreeScope_Subtree,
       NULL, ph_interface);
 
-  MSG msg;
+  MSG msg = {0};
   BOOL m_ret;
 
   if (SUCCEEDED(hr)) {
-    printf("Successfully registered event handler!\n");
 
     while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
+      if (msg.message == WM_QUIT) {
+        break;
+      }
       if (m_ret == -1) {
         break;
       } else {
@@ -86,9 +100,39 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   }
 }
 
+LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
+                                    LPARAM l_param) {
+  switch (msg) {
+  case WM_CLOSE:
+    PostQuitMessage(0);
+    return 0;
+  }
+
+  return DefWindowProc(hwnd, msg, w_param, l_param);
+}
+
+void create_hidden_window(WNDCLASSEX *wc) {
+  wc->cbSize = sizeof(WNDCLASSEX);
+  wc->lpfnWndProc = hidden_window_proc;
+  wc->hInstance = GetModuleHandle(NULL);
+  wc->lpszClassName = "uwu_hidden_window";
+  RegisterClassEx(wc);
+
+  g_hidden_wnd = CreateWindowEx(0, wc->lpszClassName, NULL, 0, 0, 0, 0, 0,
+                                HWND_MESSAGE, NULL, wc->hInstance, NULL);
+}
+
 void start_events_loop(Wm_params *wm_params) {
   HRESULT hr;
   IUIAutomationElement *root_el = NULL;
+  WNDCLASSEX wc = {0};
+
+  create_hidden_window(&wc);
+
+  if (!SetConsoleCtrlHandler(exit_handler, TRUE)) {
+    printf("Could not set control handler\n");
+    return;
+  }
 
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
   IUIAutomation *ui_utomation = NULL;
