@@ -10,6 +10,7 @@
                 "/nologo",
                 "/Fe${workspaceFolder}\\bin\\uwuwm.exe",
                 "${workspaceFolder}\\src\\structs.c",
+                "${workspaceFolder}\\src\\common.c",
                 "${workspaceFolder}\\src\\eventloop.c",
                 "${workspaceFolder}\\src\\main.c",
                 "/link",

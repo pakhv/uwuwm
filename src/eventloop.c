@@ -3,6 +3,8 @@
 #include "structs.h"
 #include <uiautomation.h>
 
+static HWND g_hidden_wnd = NULL;
+
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
   LONG ref_count;
@@ -20,17 +22,14 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
 BOOL WINAPI exit_handler(DWORD c_type);
 LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
                                     LPARAM l_param);
-
 void create_hidden_window(WNDCLASSEX *wc);
-
-static IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
-    EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
-    EventHandler_HandleAutomationEvent};
-static HWND g_hidden_wnd = NULL;
 
 void register_windows_event_handler(IUIAutomation *ui_automation,
                                     IUIAutomationElement *root_el,
                                     WmParams *wm_params) {
+  IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
+      EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
+      EventHandler_HandleAutomationEvent};
   WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
                                  .ref_count = 1,
                                  .wm_params = wm_params};
@@ -44,25 +43,28 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   MSG msg = {0};
   BOOL m_ret;
 
-  if (SUCCEEDED(hr)) {
-
-    while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
-      if (msg.message == WM_QUIT) {
-        break;
-      }
-      if (m_ret == -1) {
-        break;
-      } else {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-      }
-    }
-
-    IUIAutomation_RemoveAutomationEventHandler(
-        ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
-  } else {
-    printf("Failed to register handler\n");
+  if (FAILED(hr)) {
+    printf("Failed to register event handler\n");
+    return;
   }
+
+  while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
+    if (msg.message == WM_QUIT) {
+      break;
+    }
+    if (m_ret == -1) {
+      printf("Error reading message from the queue: %d\n", GetLastError());
+      break;
+    } else {
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+    }
+  }
+
+  printf("Successfully exited the event loop\n");
+
+  IUIAutomation_RemoveAutomationEventHandler(
+      ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
 }
 
 void start_event_loop(WmParams *wm_params) {
@@ -142,6 +144,17 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
   return S_OK;
 }
 
+void create_hidden_window(WNDCLASSEX *wc) {
+  wc->cbSize = sizeof(WNDCLASSEX);
+  wc->lpfnWndProc = hidden_window_proc;
+  wc->hInstance = GetModuleHandle(NULL);
+  wc->lpszClassName = "uwu_hidden_window";
+  RegisterClassEx(wc);
+
+  g_hidden_wnd = CreateWindowEx(0, wc->lpszClassName, NULL, 0, 0, 0, 0, 0,
+                                HWND_MESSAGE, NULL, wc->hInstance, NULL);
+}
+
 BOOL WINAPI exit_handler(DWORD c_type) {
   if ((c_type == CTRL_C_EVENT || c_type == CTRL_CLOSE_EVENT) &&
       g_hidden_wnd != NULL) {
@@ -161,15 +174,4 @@ LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
   }
 
   return DefWindowProc(hwnd, msg, w_param, l_param);
-}
-
-void create_hidden_window(WNDCLASSEX *wc) {
-  wc->cbSize = sizeof(WNDCLASSEX);
-  wc->lpfnWndProc = hidden_window_proc;
-  wc->hInstance = GetModuleHandle(NULL);
-  wc->lpszClassName = "uwu_hidden_window";
-  RegisterClassEx(wc);
-
-  g_hidden_wnd = CreateWindowEx(0, wc->lpszClassName, NULL, 0, 0, 0, 0, 0,
-                                HWND_MESSAGE, NULL, wc->hInstance, NULL);
 }
