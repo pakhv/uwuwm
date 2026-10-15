@@ -6,7 +6,7 @@
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
   LONG ref_count;
-  Wm_params *wm_params;
+  WmParams *wm_params;
 } WindowsEventHandler;
 
 STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
@@ -30,7 +30,7 @@ static HWND g_hidden_wnd = NULL;
 
 void register_windows_event_handler(IUIAutomation *ui_automation,
                                     IUIAutomationElement *root_el,
-                                    Wm_params *wm_params) {
+                                    WmParams *wm_params) {
   WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
                                  .ref_count = 1,
                                  .wm_params = wm_params};
@@ -65,7 +65,7 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   }
 }
 
-void start_events_loop(Wm_params *wm_params) {
+void start_event_loop(WmParams *wm_params) {
   HRESULT hr;
   IUIAutomationElement *root_el = NULL;
   WNDCLASSEX wc = {0};

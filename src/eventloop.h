@@ -3,6 +3,6 @@
 #ifndef EVENT_LOOP_H
 #define EVENT_LOOP_H
 
-void start_events_loop(Wm_params *wm_params);
+void start_event_loop(WmParams *wm_params);
 
 #endif

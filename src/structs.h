@@ -4,12 +4,9 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-#define DEFINE_VECTOR(T)                                                       \
-  typedef struct {                                                             \
-    T **data;                                                                  \
-    size_t size;                                                               \
-    size_t capacity;                                                           \
-  } Vector_##T;
+#define HIDDEN_WINDOW_X -3900
+#define MAX_EXE_PATH_LENGTH 300
+#define MAX_EXE_NAME_LENGTH 100
 
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
@@ -18,41 +15,37 @@
     p->data = NULL;                                                            \
   } while (0);
 
-#define FREE_VECTOR(p)                                                         \
-  do {                                                                         \
-    for (size_t i = 0; i < p->size; i++) {                                     \
-      free(p->data[i]);                                                        \
-    }                                                                          \
-                                                                               \
-    free(p->data);                                                             \
-    p->size = 0;                                                               \
-    p->capacity = 0;                                                           \
-  } while (0);
-
-#define HIDDEN_WINDOW_X -3900
-
-#define MAX_EXE_PATH_LENGTH 300
-#define MAX_EXE_NAME_LENGTH 100
-
 typedef struct {
   HWND handle;
   char *process_name;
   RECT w_rect;
 } Window;
 
-DEFINE_VECTOR(Window)
+typedef struct {
+  Window **data;
+  size_t size;
+  size_t capacity;
+} WindowsVector;
 
 typedef struct {
   size_t num;
   HMONITOR monitor;
-  Vector_Window *windows;
+  WindowsVector *windows;
 } Workspace;
 
-DEFINE_VECTOR(Workspace)
+typedef struct {
+  Workspace **data;
+  size_t size;
+  size_t capacity;
+} WorkspacesVector;
 
 typedef struct {
   size_t active_workspace;
-  Vector_Workspace *workspaces;
-} Wm_params;
+  WorkspacesVector *workspaces;
+} WmParams;
+
+void workspace_array_add(WorkspacesVector *arr, Workspace *el);
+void wnd_array_add(WindowsVector *arr, Window *el);
+void cleanup(WmParams *wm_params);
 
 #endif

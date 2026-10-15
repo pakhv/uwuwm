@@ -5,23 +5,19 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
 
-void calculate_windows_init(Wm_params *params);
-void position_windows_init(Wm_params *wm_params);
+void calculate_windows_init(WmParams *params);
+void position_windows_init(WmParams *wm_params);
 
-BOOL position_windows(HDWP hdwp, Vector_Window *windows, BOOL visible);
-BOOL calculate_windows(Vector_Window *windows, LPRECT m_rect);
+BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible);
+BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect);
 
 BOOL map_to_window_coords(HWND window, LPRECT t_rect);
-size_t get_windows_number(Wm_params *wm_params);
-Workspace *get_active_workspace(Wm_params *wm_params);
+size_t get_windows_number(WmParams *wm_params);
+Workspace *get_active_workspace(WmParams *wm_params);
 
-void workspace_array_add(Vector_Workspace *arr, Workspace *el);
-void wnd_array_add(Vector_Window *arr, Window *el);
-
-void init(Wm_params *wm_params) {
+void init(WmParams *wm_params) {
   wm_params->active_workspace = 1;
-  wm_params->workspaces = malloc(sizeof(Vector_Workspace));
-
+  wm_params->workspaces = malloc(sizeof(WorkspacesVector));
   INIT_VECTOR(wm_params->workspaces)
 
   EnumDisplayMonitors(NULL, NULL, enum_monitors_proc,
@@ -29,17 +25,8 @@ void init(Wm_params *wm_params) {
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 }
 
-void cleanup(Wm_params *wm_params) {
-  for (size_t j = 0; j < wm_params->workspaces->size; j++) {
-    FREE_VECTOR(wm_params->workspaces->data[j]->windows)
-  }
-
-  FREE_VECTOR(wm_params->workspaces)
-  free(wm_params->workspaces);
-}
-
 void main(void) {
-  Wm_params wm_params = {0};
+  WmParams wm_params = {0};
   init(&wm_params);
 
   printf("Windows num: %zu\n", get_windows_number(&wm_params));
@@ -48,13 +35,13 @@ void main(void) {
   calculate_windows_init(&wm_params);
   position_windows_init(&wm_params);
 
-  start_events_loop(&wm_params);
+  start_event_loop(&wm_params);
 
   cleanup(&wm_params);
 }
 
-void calculate_windows_init(Wm_params *params) {
-  Vector_Window *v_windows = malloc(sizeof(Vector_Window));
+void calculate_windows_init(WmParams *params) {
+  WindowsVector *v_windows = malloc(sizeof(WindowsVector));
   INIT_VECTOR(v_windows)
 
   HMONITOR monitor;
@@ -84,7 +71,7 @@ void calculate_windows_init(Wm_params *params) {
   free(v_windows);
 }
 
-BOOL calculate_windows(Vector_Window *windows, LPRECT m_rect) {
+BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   if (windows->size == 0) {
     return TRUE;
   }
@@ -115,7 +102,7 @@ BOOL calculate_windows(Vector_Window *windows, LPRECT m_rect) {
   return TRUE;
 }
 
-void position_windows_init(Wm_params *wm_params) {
+void position_windows_init(WmParams *wm_params) {
   size_t w_num = get_windows_number(wm_params);
 
   HDWP hdwp = BeginDeferWindowPos(w_num);
@@ -129,7 +116,7 @@ void position_windows_init(Wm_params *wm_params) {
 
     if (workspace->num == wm_params->active_workspace) {
       if (!position_windows(hdwp, workspace->windows, TRUE)) {
-        printf("Failed to position visible windows \n");
+        printf("Failed to position visible windows\n");
         return;
       }
 
@@ -137,7 +124,7 @@ void position_windows_init(Wm_params *wm_params) {
     }
 
     if (!position_windows(hdwp, workspace->windows, FALSE)) {
-      printf("Failed to position invisible windows \n");
+      printf("Failed to position invisible windows\n");
       return;
     }
   }
@@ -147,7 +134,7 @@ void position_windows_init(Wm_params *wm_params) {
   }
 }
 
-BOOL position_windows(HDWP hdwp, Vector_Window *windows, BOOL visible) {
+BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
   if (windows->size == 0) {
     return TRUE;
   }
@@ -242,7 +229,7 @@ void get_process_name_by_window(HWND h_wnd, char *p_name) {
 }
 
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
-  Wm_params *wm_params = (Wm_params *)l_param;
+  WmParams *wm_params = (WmParams *)l_param;
 
   if (!IsWindowVisible(h_wnd)) {
     return TRUE;
@@ -278,7 +265,7 @@ BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
 
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param) {
-  Vector_Workspace *workspaces = (Vector_Workspace *)l_param;
+  WorkspacesVector *workspaces = (WorkspacesVector *)l_param;
 
   Workspace *workspace = malloc(sizeof(Workspace));
   workspace_array_add(workspaces, workspace);
@@ -286,7 +273,7 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
   workspace->monitor = h_monitor;
   workspace->num = workspaces->size;
 
-  Vector_Window *windows = malloc(sizeof(Vector_Window));
+  WindowsVector *windows = malloc(sizeof(WindowsVector));
   INIT_VECTOR(windows);
 
   workspace->windows = windows;
@@ -294,7 +281,7 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
   return TRUE;
 }
 
-size_t get_windows_number(Wm_params *wm_params) {
+size_t get_windows_number(WmParams *wm_params) {
   size_t w_num = 0;
   for (size_t i = 0; i < wm_params->workspaces->size; i++) {
     w_num += wm_params->workspaces->data[i]->windows->size;
@@ -303,7 +290,7 @@ size_t get_windows_number(Wm_params *wm_params) {
   return w_num;
 }
 
-Workspace *get_active_workspace(Wm_params *wm_params) {
+Workspace *get_active_workspace(WmParams *wm_params) {
   for (size_t i = 0; i < wm_params->workspaces->size; i++) {
     if (wm_params->workspaces->data[i]->num == wm_params->active_workspace) {
       return wm_params->workspaces->data[i];
@@ -311,24 +298,4 @@ Workspace *get_active_workspace(Wm_params *wm_params) {
   }
 
   return NULL;
-}
-
-void workspace_array_add(Vector_Workspace *arr, Workspace *el) {
-  if (arr->capacity <= arr->size) {
-    arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Workspace *));
-  }
-
-  arr->data[arr->size] = el;
-  arr->size += 1;
-}
-
-void wnd_array_add(Vector_Window *arr, Window *el) {
-  if (arr->capacity <= arr->size) {
-    arr->capacity = 2 * (arr->size + 1);
-    arr->data = realloc(arr->data, arr->capacity * sizeof(Window *));
-  }
-
-  arr->data[arr->size] = el;
-  arr->size += 1;
 }
