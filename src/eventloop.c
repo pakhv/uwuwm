@@ -1,6 +1,6 @@
 #define COBJMACROS
 
-#include "structs.h"
+#include "common.h"
 #include <uiautomation.h>
 
 static HWND g_hidden_wnd = NULL;
@@ -9,6 +9,7 @@ typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
   LONG ref_count;
   WmParams *wm_params;
+  IUIAutomation *ui_automation;
 } WindowsEventHandler;
 
 STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
@@ -32,7 +33,8 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
       EventHandler_HandleAutomationEvent};
   WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
                                  .ref_count = 1,
-                                 .wm_params = wm_params};
+                                 .wm_params = wm_params,
+                                 .ui_automation = ui_automation};
   IUIAutomationEventHandler *ph_interface =
       (IUIAutomationEventHandler *)&handler;
 
@@ -40,13 +42,22 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
       ui_automation, UIA_Window_WindowOpenedEventId, root_el, TreeScope_Subtree,
       NULL, ph_interface);
 
-  MSG msg = {0};
-  BOOL m_ret;
-
   if (FAILED(hr)) {
-    printf("Failed to register event handler\n");
+    printf("Failed to register window opened event handler\n");
     return;
   }
+
+  hr = IUIAutomation_AddAutomationEventHandler(
+      ui_automation, UIA_Window_WindowClosedEventId, root_el, TreeScope_Subtree,
+      NULL, ph_interface);
+
+  if (FAILED(hr)) {
+    printf("Failed to register window closed event handler\n");
+    return;
+  }
+
+  MSG msg = {0};
+  BOOL m_ret;
 
   while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
     if (msg.message == WM_QUIT) {
@@ -140,7 +151,30 @@ STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *this) {
 STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
                                                 IUIAutomationElement *sender,
                                                 EVENTID event_id) {
+  WindowsEventHandler *e_handler = (WindowsEventHandler *)this;
+
+  UIA_HWND window = NULL;
+  HRESULT hr =
+      IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
+
+  if (FAILED(hr)) {
+    return S_OK;
+  }
+
   printf("Event received! Event ID: %d\n", event_id);
+
+  Workspace *active_workspace = get_active_workspace(e_handler->wm_params);
+
+  if (event_id == UIA_Window_WindowOpenedEventId &&
+      !is_window_tracked(window, e_handler->wm_params)) {
+    workspace_add_window(window, active_workspace);
+  }
+
+  if (event_id == UIA_Window_WindowClosedEventId) {
+    remove_window(window, e_handler->wm_params->workspaces);
+    log_state(e_handler->wm_params);
+  }
+
   return S_OK;
 }
 

@@ -127,15 +127,15 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
   return TRUE;
 }
 
-BOOL map_to_window_coords(HWND window, LPRECT t_rect) {
+BOOL map_to_window_coords(HWND hwnd, LPRECT t_rect) {
   RECT real_w_rect = {0};
-  if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS,
+  if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS,
                                    &real_w_rect, sizeof(RECT)))) {
     return FALSE;
   }
 
   RECT w_rect = {0};
-  if (!GetWindowRect(window, &w_rect)) {
+  if (!GetWindowRect(hwnd, &w_rect)) {
     return FALSE;
   }
 
@@ -170,9 +170,9 @@ void extract_exe_name(char *path, DWORD p_l, char *name) {
   name[name_l] = '\0';
 }
 
-void get_process_name_by_window(HWND h_wnd, char *p_name) {
+void get_process_name_by_window(HWND hwnd, char *p_name) {
   DWORD p_id = 0;
-  if (!GetWindowThreadProcessId(h_wnd, &p_id)) {
+  if (!GetWindowThreadProcessId(hwnd, &p_id)) {
     return;
   }
 
@@ -206,4 +206,112 @@ Workspace *get_active_workspace(WmParams *wm_params) {
   }
 
   return NULL;
+}
+
+BOOL workspace_add_window(HWND hwnd, Workspace *workspace) {
+  if (!IsWindowVisible(hwnd)) {
+    return FALSE;
+  }
+
+  LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+  if (exStyle & WS_EX_TOOLWINDOW) {
+    return FALSE;
+  }
+
+  int cloaked = 0;
+  HRESULT hr =
+      DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
+  if (SUCCEEDED(hr) && cloaked != 0) {
+    return FALSE;
+  }
+
+  Window *window = malloc(sizeof(Window));
+
+  char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
+  get_process_name_by_window(hwnd, p_name);
+
+  window->process_name = p_name;
+  window->handle = hwnd;
+
+  wnd_array_add(workspace->windows, window);
+
+  printf("Added window with process name \"%s\" to workspace %zu\n",
+         window->process_name, workspace->num);
+
+  return TRUE;
+}
+
+BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
+  Window *r_window = NULL;
+
+  for (size_t i = 0; i < workspaces->size; i++) {
+    WindowsVector *windows = workspaces->data[i]->windows;
+
+    for (size_t j = 0; j < windows->size; j++) {
+      if (windows->data[j]->handle == hwnd) {
+        r_window = windows->data[j];
+        windows->data[j] = NULL;
+        break;
+      }
+    }
+
+    if (r_window != NULL) {
+      cleanup_window(r_window);
+      cleanup_workspace_windows(workspaces->data[i]);
+
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+void cleanup_workspace_windows(Workspace *workspace) {
+  WindowsVector *windows = malloc(sizeof(WindowsVector));
+  INIT_VECTOR(windows);
+
+  for (size_t i = 0; i < workspace->windows->size; i++) {
+    if (workspace->windows->data[i] != NULL) {
+      wnd_array_add(windows, workspace->windows->data[i]);
+    }
+  }
+
+  workspace->windows = windows;
+}
+
+void log_state(WmParams *wm_params) {
+  printf("\n-------\n");
+  printf("Active workspace: %zu\n\n", wm_params->active_workspace);
+
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    Workspace *workspace = wm_params->workspaces->data[i];
+
+    printf("Workspace %zu:\n", workspace->num);
+    for (size_t j = 0; j < workspace->windows->size; j++) {
+      if (workspace->windows->data[j] == NULL) {
+        continue;
+      }
+
+      Window *window = workspace->windows->data[j];
+      printf("  %s (%p position: %d %d %d %d);\n", window->process_name,
+             window->handle, window->w_rect.left, window->w_rect.top,
+             window->w_rect.right, window->w_rect.bottom);
+    }
+  }
+
+  printf("\n-------\n");
+}
+
+BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    Workspace *workspace = wm_params->workspaces->data[i];
+
+    for (size_t j = 0; j < workspace->windows->size; j++) {
+      if (workspace->windows->data[j]->handle == hwnd) {
+        return TRUE;
+      }
+    }
+  }
+
+  return FALSE;
 }

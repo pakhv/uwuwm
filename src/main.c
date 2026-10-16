@@ -31,37 +31,16 @@ void main(void) {
   cleanup(&wm_params);
 }
 
-BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param) {
+BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
   WmParams *wm_params = (WmParams *)l_param;
 
-  if (!IsWindowVisible(h_wnd)) {
-    return TRUE;
-  }
-
-  LONG_PTR exStyle = GetWindowLongPtr(h_wnd, GWL_EXSTYLE);
-  if (exStyle & WS_EX_TOOLWINDOW) {
-    return TRUE;
-  }
-
-  int cloaked = 0;
-  HRESULT hr =
-      DwmGetWindowAttribute(h_wnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
-  if (SUCCEEDED(hr) && cloaked != 0) {
-    return TRUE;
-  }
-
   Workspace *active_workspace = get_active_workspace(wm_params);
-  Window *window = malloc(sizeof(Window));
+  if (active_workspace == NULL) {
+    printf("Couldn't find active workspace\n");
+    return FALSE;
+  }
 
-  char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
-  get_process_name_by_window(h_wnd, p_name);
-
-  window->process_name = p_name;
-  window->handle = h_wnd;
-
-  wnd_array_add(active_workspace->windows, window);
-
-  printf("%s\n", window->process_name);
+  workspace_add_window(hwnd, active_workspace);
 
   return TRUE;
 }

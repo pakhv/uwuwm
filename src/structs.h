@@ -47,5 +47,6 @@ typedef struct {
 void workspace_array_add(WorkspacesVector *arr, Workspace *el);
 void wnd_array_add(WindowsVector *arr, Window *el);
 void cleanup(WmParams *wm_params);
+void cleanup_window(Window *window);
 
 #endif

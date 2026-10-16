@@ -28,8 +28,10 @@ void cleanup(WmParams *wm_params) {
     windows = workspaces->data[i]->windows;
 
     for (size_t j = 0; j < windows->size; j++) {
-      free(windows->data[j]->process_name);
-      free(windows->data[j]);
+      if (windows->data[j] != NULL) {
+        free(windows->data[j]->process_name);
+        free(windows->data[j]);
+      }
     }
 
     free(windows);
@@ -41,4 +43,11 @@ void cleanup(WmParams *wm_params) {
   workspaces->capacity = 0;
 
   free(workspaces);
+}
+
+void cleanup_window(Window *window) {
+  free(window->process_name);
+  window->handle = NULL;
+  window->process_name = NULL;
+  free(window);
 }
