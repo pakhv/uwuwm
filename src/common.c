@@ -293,8 +293,8 @@ void log_state(WmParams *wm_params) {
       }
 
       Window *window = workspace->windows->data[j];
-      printf("  %s (%p position: %d %d %d %d);\n", window->process_name,
-             window->handle, window->w_rect.left, window->w_rect.top,
+      printf("  %s: position (l = %d t = %d r = %d b = %d)\n",
+             window->process_name, window->w_rect.left, window->w_rect.top,
              window->w_rect.right, window->w_rect.bottom);
     }
   }
@@ -302,12 +302,17 @@ void log_state(WmParams *wm_params) {
   printf("\n-------\n");
 }
 
-BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
+BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params) {
+  BOOL same;
+  HRESULT hr;
+
   for (size_t i = 0; i < wm_params->workspaces->size; i++) {
     Workspace *workspace = wm_params->workspaces->data[i];
 
     for (size_t j = 0; j < workspace->windows->size; j++) {
-      if (workspace->windows->data[j]->handle == hwnd) {
+      hr = compare_runtime_ids(rid, workspace->windows->data[j]->runtime_id,
+                               &same);
+      if (SUCCEEDED(hr) && same) {
         return TRUE;
       }
     }

@@ -113,14 +113,13 @@ void start_event_loop(WmParams *wm_params) {
   register_windows_event_handler(ui_automation, root_el, wm_params);
 
 Cleanup:
-  if (ui_automation != NULL) {
-    hr = IUIAutomation_RemoveAllEventHandlers(ui_automation);
-    if (FAILED(hr))
-      IUIAutomation_Release(ui_automation);
+  if (root_el != NULL) {
+    IUIAutomationElement_Release(root_el);
   }
 
-  if (root_el != NULL)
-    IUIAutomationElement_Release(root_el);
+  if (ui_automation != NULL) {
+    IUIAutomation_Release(ui_automation);
+  }
 
   CoUninitialize();
 }
@@ -177,6 +176,14 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
                                                 EVENTID event_id) {
   WindowsEventHandler *e_handler = (WindowsEventHandler *)this;
   UIA_HWND window = NULL;
+  SAFEARRAY *rid = NULL;
+
+  HRESULT hr = IUIAutomationElement_GetRuntimeId(sender, &rid);
+  if (FAILED(hr)) {
+    printf("Error handling event %d: failed to get element runtime id\n",
+           event_id);
+    return S_OK;
+  }
 
   Workspace *active_workspace = get_active_workspace(e_handler->wm_params);
 
@@ -191,12 +198,7 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
   }
 
   if (event_id == UIA_Window_WindowClosedEventId) {
-    SAFEARRAY *rid = NULL;
-    HRESULT hr = IUIAutomationElement_GetRuntimeId(sender, &rid);
-
-    if (SUCCEEDED(hr)) {
-      remove_window(rid, e_handler->wm_params->workspaces);
-    }
+    remove_window(rid, e_handler->wm_params->workspaces);
   }
 
   log_state(e_handler->wm_params);
