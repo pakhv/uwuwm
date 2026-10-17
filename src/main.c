@@ -7,6 +7,11 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
 
 void init(WmParams *wm_params) {
+  if (!init_uiautomation()) {
+    printf("Failed to initialize uiautomation");
+    return;
+  }
+
   wm_params->active_workspace = 1;
   wm_params->workspaces = malloc(sizeof(WorkspacesVector));
   INIT_VECTOR(wm_params->workspaces)
@@ -40,7 +45,7 @@ BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
     return FALSE;
   }
 
-  workspace_add_window(hwnd, active_workspace);
+  add_window(hwnd, active_workspace->windows);
 
   return TRUE;
 }

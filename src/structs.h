@@ -18,6 +18,7 @@
 typedef struct {
   HWND handle;
   char *process_name;
+  SAFEARRAY *runtime_id;
   RECT w_rect;
 } Window;
 

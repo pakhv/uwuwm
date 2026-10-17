@@ -14,9 +14,9 @@ size_t get_windows_number(WmParams *wm_params);
 
 Workspace *get_active_workspace(WmParams *wm_params);
 
-BOOL workspace_add_window(HWND hwnd, Workspace *workspace);
+BOOL add_window(HWND hwnd, WindowsVector *windows);
 
-BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces);
+void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces);
 
 void cleanup_workspace_windows(Workspace *workspace);
 

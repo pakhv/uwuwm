@@ -1,9 +1,10 @@
 #define COBJMACROS
 
 #include "common.h"
-#include <uiautomation.h>
+#include <UIAutomationClient.h>
 
 static HWND g_hidden_wnd = NULL;
+static IUIAutomation *ui_automation = NULL;
 
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
@@ -78,6 +79,20 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
       ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
 }
 
+BOOL init_uiautomation() {
+  CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+  HRESULT hr;
+  hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
+                        &IID_IUIAutomation, &ui_automation);
+
+  if (FAILED(hr) || ui_automation == NULL) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 void start_event_loop(WmParams *wm_params) {
   HRESULT hr;
   IUIAutomationElement *root_el = NULL;
@@ -90,27 +105,18 @@ void start_event_loop(WmParams *wm_params) {
     return;
   }
 
-  CoInitializeEx(NULL, COINIT_MULTITHREADED);
-  IUIAutomation *ui_utomation = NULL;
-  hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-                        &IID_IUIAutomation, &ui_utomation);
-
-  if (FAILED(hr) || ui_utomation == NULL) {
-    goto Cleanup;
-  }
-
-  hr = IUIAutomation_GetRootElement(ui_utomation, &root_el);
+  hr = IUIAutomation_GetRootElement(ui_automation, &root_el);
   if (FAILED(hr) || root_el == NULL) {
     goto Cleanup;
   }
 
-  register_windows_event_handler(ui_utomation, root_el, wm_params);
+  register_windows_event_handler(ui_automation, root_el, wm_params);
 
 Cleanup:
-  if (ui_utomation != NULL) {
-    hr = IUIAutomation_RemoveAllEventHandlers(ui_utomation);
+  if (ui_automation != NULL) {
+    hr = IUIAutomation_RemoveAllEventHandlers(ui_automation);
     if (FAILED(hr))
-      IUIAutomation_Release(ui_utomation);
+      IUIAutomation_Release(ui_automation);
   }
 
   if (root_el != NULL)
@@ -119,10 +125,28 @@ Cleanup:
   CoUninitialize();
 }
 
+HRESULT get_window_runtime_id(HWND hwnd, SAFEARRAY **rid) {
+  IUIAutomationElement *element = NULL;
+  HRESULT hr = IUIAutomation_ElementFromHandle(ui_automation, hwnd, &element);
+
+  if (FAILED(hr)) {
+    printf("Failed to get runtime id for a handle");
+    return hr;
+  }
+
+  hr = IUIAutomationElement_GetRuntimeId(element, rid);
+  return hr;
+}
+
+HRESULT compare_runtime_ids(SAFEARRAY *rid1, SAFEARRAY *rid2, BOOL *result) {
+  return IUIAutomation_CompareRuntimeIds(ui_automation, rid1, rid2, result);
+}
+
 STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
                                          REFIID riid, void **ppv_object) {
-  if (!ppv_object)
+  if (!ppv_object) {
     return E_POINTER;
+  }
 
   if (IsEqualIID(riid, &IID_IUnknown) ||
       IsEqualIID(riid, &IID_IUIAutomationEventHandler)) {
@@ -152,28 +176,30 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
                                                 IUIAutomationElement *sender,
                                                 EVENTID event_id) {
   WindowsEventHandler *e_handler = (WindowsEventHandler *)this;
-
   UIA_HWND window = NULL;
-  HRESULT hr =
-      IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
-
-  if (FAILED(hr)) {
-    return S_OK;
-  }
-
-  printf("Event received! Event ID: %d\n", event_id);
 
   Workspace *active_workspace = get_active_workspace(e_handler->wm_params);
 
   if (event_id == UIA_Window_WindowOpenedEventId &&
       !is_window_tracked(window, e_handler->wm_params)) {
-    workspace_add_window(window, active_workspace);
+    HRESULT hr =
+        IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
+
+    if (SUCCEEDED(hr)) {
+      add_window(window, active_workspace->windows);
+    }
   }
 
   if (event_id == UIA_Window_WindowClosedEventId) {
-    remove_window(window, e_handler->wm_params->workspaces);
-    log_state(e_handler->wm_params);
+    SAFEARRAY *rid = NULL;
+    HRESULT hr = IUIAutomationElement_GetRuntimeId(sender, &rid);
+
+    if (SUCCEEDED(hr)) {
+      remove_window(rid, e_handler->wm_params->workspaces);
+    }
   }
+
+  log_state(e_handler->wm_params);
 
   return S_OK;
 }

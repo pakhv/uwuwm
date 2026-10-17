@@ -1,4 +1,5 @@
 #include "common.h"
+#include "eventloop.h"
 #include <dwmapi.h>
 
 void calculate_windows_init(WmParams *params) {
@@ -208,7 +209,7 @@ Workspace *get_active_workspace(WmParams *wm_params) {
   return NULL;
 }
 
-BOOL workspace_add_window(HWND hwnd, Workspace *workspace) {
+BOOL add_window(HWND hwnd, WindowsVector *windows) {
   if (!IsWindowVisible(hwnd)) {
     return FALSE;
   }
@@ -232,38 +233,37 @@ BOOL workspace_add_window(HWND hwnd, Workspace *workspace) {
 
   window->process_name = p_name;
   window->handle = hwnd;
+  get_window_runtime_id(hwnd, &window->runtime_id);
 
-  wnd_array_add(workspace->windows, window);
+  wnd_array_add(windows, window);
 
-  printf("Added window with process name \"%s\" to workspace %zu\n",
-         window->process_name, workspace->num);
+  printf("Added window with process name \"%s\"\n", window->process_name);
 
   return TRUE;
 }
 
-BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
-  Window *r_window = NULL;
+void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
+  BOOL same;
+  HRESULT hr;
 
   for (size_t i = 0; i < workspaces->size; i++) {
     WindowsVector *windows = workspaces->data[i]->windows;
 
     for (size_t j = 0; j < windows->size; j++) {
-      if (windows->data[j]->handle == hwnd) {
-        r_window = windows->data[j];
+      hr = compare_runtime_ids(rid, windows->data[j]->runtime_id, &same);
+
+      if (SUCCEEDED(hr) && same) {
+        printf("Removing window \"%s\" from namespace %zu\n",
+               windows->data[j]->process_name, workspaces->data[i]->num);
+
+        cleanup_window(windows->data[j]);
         windows->data[j] = NULL;
-        break;
+        cleanup_workspace_windows(workspaces->data[i]);
+
+        return;
       }
     }
-
-    if (r_window != NULL) {
-      cleanup_window(r_window);
-      cleanup_workspace_windows(workspaces->data[i]);
-
-      return TRUE;
-    }
   }
-
-  return FALSE;
 }
 
 void cleanup_workspace_windows(Workspace *workspace) {
