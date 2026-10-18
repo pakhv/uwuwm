@@ -222,13 +222,7 @@ BOOL is_window_manageable(HWND hwnd) {
     return FALSE;
   }
 
-  RECT rect = {0};
-  GetWindowRect(hwnd, &rect);
-  printf("%d %d %d %d\n", rect.left, rect.right, rect.top, rect.bottom);
-
   LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-  printf("%lld\n", exStyle);
-
   if (exStyle & WS_EX_TOOLWINDOW || exStyle & WS_SYSMENU == 0 ||
       exStyle & WS_EX_APPWINDOW == 0) {
     return FALSE;

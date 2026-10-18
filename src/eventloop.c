@@ -4,7 +4,7 @@
 #include <UIAutomationClient.h>
 
 static HWND g_hidden_wnd = NULL;
-static IUIAutomation *ui_automation = NULL;
+IUIAutomation *ui_automation = NULL;
 
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
@@ -13,13 +13,17 @@ typedef struct WindowsEventHandler {
   IUIAutomation *ui_automation;
 } WindowsEventHandler;
 
-STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
+STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *h,
                                          REFIID riid, void **ppv_object);
-STDMETHODIMP_(ULONG) EventHandler_AddRef(IUIAutomationEventHandler *this);
-STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *this);
-STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
+STDMETHODIMP_(ULONG) EventHandler_AddRef(IUIAutomationEventHandler *h);
+STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *h);
+STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *h,
                                                 IUIAutomationElement *sender,
                                                 EVENTID event_id);
+
+static IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
+    EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
+    EventHandler_HandleAutomationEvent};
 
 BOOL WINAPI exit_handler(DWORD c_type);
 LRESULT CALLBACK hidden_window_proc(HWND hwnd, UINT msg, WPARAM w_param,
@@ -29,15 +33,15 @@ void create_hidden_window(WNDCLASSEX *wc);
 void register_windows_event_handler(IUIAutomation *ui_automation,
                                     IUIAutomationElement *root_el,
                                     WmParams *wm_params) {
-  IUIAutomationEventHandlerVtbl windows_event_handler_vtbl = {
-      EventHandler_QueryInterface, EventHandler_AddRef, EventHandler_Release,
-      EventHandler_HandleAutomationEvent};
-  WindowsEventHandler handler = {.lp_vtbl = &windows_event_handler_vtbl,
-                                 .ref_count = 1,
-                                 .wm_params = wm_params,
-                                 .ui_automation = ui_automation};
+
+  WindowsEventHandler *handler = malloc(sizeof(WindowsEventHandler));
+  handler->lp_vtbl = &windows_event_handler_vtbl;
+  handler->ref_count = 1;
+  handler->wm_params = wm_params;
+  handler->ui_automation = ui_automation;
+
   IUIAutomationEventHandler *ph_interface =
-      (IUIAutomationEventHandler *)&handler;
+      (IUIAutomationEventHandler *)handler;
 
   HRESULT hr = IUIAutomation_AddAutomationEventHandler(
       ui_automation, UIA_Window_WindowOpenedEventId, root_el, TreeScope_Subtree,
@@ -76,7 +80,10 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   printf("Successfully exited the event loop\n");
 
   IUIAutomation_RemoveAutomationEventHandler(
-      ui_automation, UIA_Invoke_InvokedEventId, root_el, ph_interface);
+      ui_automation, UIA_Window_WindowOpenedEventId, root_el, ph_interface);
+  IUIAutomation_RemoveAutomationEventHandler(
+      ui_automation, UIA_Window_WindowClosedEventId, root_el, ph_interface);
+  free(handler);
 }
 
 BOOL init_uiautomation() {
@@ -84,7 +91,7 @@ BOOL init_uiautomation() {
 
   HRESULT hr;
   hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-                        &IID_IUIAutomation, &ui_automation);
+                        &IID_IUIAutomation, (void **)&ui_automation);
 
   if (FAILED(hr) || ui_automation == NULL) {
     return FALSE;
@@ -141,7 +148,7 @@ HRESULT compare_runtime_ids(SAFEARRAY *rid1, SAFEARRAY *rid2, BOOL *result) {
   return IUIAutomation_CompareRuntimeIds(ui_automation, rid1, rid2, result);
 }
 
-STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
+STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *h,
                                          REFIID riid, void **ppv_object) {
   if (!ppv_object) {
     return E_POINTER;
@@ -149,8 +156,8 @@ STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
 
   if (IsEqualIID(riid, &IID_IUnknown) ||
       IsEqualIID(riid, &IID_IUIAutomationEventHandler)) {
-    *ppv_object = this;
-    this->lpVtbl->AddRef(this);
+    *ppv_object = h;
+    h->lpVtbl->AddRef(h);
     return S_OK;
   }
 
@@ -158,23 +165,23 @@ STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *this,
   return E_NOINTERFACE;
 }
 
-STDMETHODIMP_(ULONG) EventHandler_AddRef(IUIAutomationEventHandler *this) {
-  WindowsEventHandler *myThis = (WindowsEventHandler *)this;
-  return InterlockedIncrement(&myThis->ref_count);
+STDMETHODIMP_(ULONG) EventHandler_AddRef(IUIAutomationEventHandler *h) {
+  WindowsEventHandler *handler = (WindowsEventHandler *)h;
+  return InterlockedIncrement(&handler->ref_count);
 }
 
-STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *this) {
-  WindowsEventHandler *myThis = (WindowsEventHandler *)this;
-  LONG count = InterlockedDecrement(&myThis->ref_count);
+STDMETHODIMP_(ULONG) EventHandler_Release(IUIAutomationEventHandler *h) {
+  WindowsEventHandler *handler = (WindowsEventHandler *)h;
+  LONG count = InterlockedDecrement(&handler->ref_count);
   if (count == 0) {
   }
   return count;
 }
 
-STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
+STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *h,
                                                 IUIAutomationElement *sender,
                                                 EVENTID event_id) {
-  WindowsEventHandler *e_handler = (WindowsEventHandler *)this;
+  WindowsEventHandler *handler = (WindowsEventHandler *)h;
   UIA_HWND window = NULL;
   SAFEARRAY *rid = NULL;
 
@@ -185,10 +192,10 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
     return S_OK;
   }
 
-  Workspace *active_workspace = get_active_workspace(e_handler->wm_params);
+  Workspace *active_workspace = get_active_workspace(handler->wm_params);
 
   if (event_id == UIA_Window_WindowOpenedEventId &&
-      !is_window_tracked(rid, e_handler->wm_params)) {
+      !is_window_tracked(rid, handler->wm_params)) {
     HRESULT hr =
         IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
 
@@ -198,20 +205,20 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
       }
 
       calculate_workspace_windows(active_workspace);
-      position_workspaces_windows(e_handler->wm_params);
+      position_workspaces_windows(handler->wm_params);
     }
   }
 
   if (event_id == UIA_Window_WindowClosedEventId) {
-    if (!remove_window(rid, e_handler->wm_params->workspaces)) {
+    if (!remove_window(rid, handler->wm_params->workspaces)) {
       return S_OK;
     }
 
     calculate_workspace_windows(active_workspace);
-    position_workspaces_windows(e_handler->wm_params);
+    position_workspaces_windows(handler->wm_params);
   }
 
-  log_state(e_handler->wm_params);
+  log_state(handler->wm_params);
 
   return S_OK;
 }

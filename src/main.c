@@ -1,6 +1,8 @@
 #include "common.h"
 #include "eventloop.h"
 #include <dwmapi.h>
+#include <process.h>
+#include <windows.h>
 
 BOOL CALLBACK enum_windows_proc(HWND h_wnd, LPARAM l_param);
 BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
@@ -21,17 +23,29 @@ void init(WmParams *wm_params) {
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 }
 
+DWORD WINAPI start_uwuwm(void *params) {
+  WmParams *wm_params = (WmParams *)params;
+
+  init(wm_params);
+
+  printf("Windows num: %zu\n", get_windows_number(wm_params));
+  printf("Workspaces num: %zu\n", wm_params->workspaces->size);
+
+  calculate_windows_init(wm_params);
+  position_workspaces_windows(wm_params);
+
+  start_event_loop(wm_params);
+
+  return 0;
+}
+
 void main(void) {
   WmParams wm_params = {0};
-  init(&wm_params);
 
-  printf("Windows num: %zu\n", get_windows_number(&wm_params));
-  printf("Workspaces num: %zu\n", wm_params.workspaces->size);
+  HANDLE th = (HANDLE)_beginthreadex(NULL, 0, start_uwuwm, &wm_params, 0, NULL);
 
-  calculate_windows_init(&wm_params);
-  position_workspaces_windows(&wm_params);
-
-  start_event_loop(&wm_params);
+  WaitForSingleObject(th, INFINITE);
+  CloseHandle(th);
 
   cleanup(&wm_params);
 }
