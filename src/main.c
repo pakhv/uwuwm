@@ -55,7 +55,7 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
   WorkspacesVector *workspaces = (WorkspacesVector *)l_param;
 
   Workspace *workspace = malloc(sizeof(Workspace));
-  workspace_array_add(workspaces, workspace);
+  workspaces_vec_add(workspaces, workspace);
 
   workspace->monitor = h_monitor;
   workspace->num = workspaces->size;

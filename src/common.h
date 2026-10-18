@@ -18,8 +18,6 @@ BOOL add_window(HWND hwnd, WindowsVector *windows);
 
 void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces);
 
-void cleanup_workspace_windows(Workspace *workspace);
-
 void log_state(WmParams *wm_params);
 
 BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params);

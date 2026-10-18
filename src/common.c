@@ -23,7 +23,7 @@ void calculate_windows_init(WmParams *params) {
       Window *window = workspace->windows->data[i];
 
       if (!IsIconic(window->handle)) {
-        wnd_array_add(v_windows, window);
+        windows_vec_add(v_windows, window);
       }
     }
 
@@ -235,7 +235,7 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
   window->handle = hwnd;
   get_window_runtime_id(hwnd, &window->runtime_id);
 
-  wnd_array_add(windows, window);
+  windows_vec_add(windows, window);
 
   printf("Added window with process name \"%s\"\n", window->process_name);
 
@@ -256,27 +256,12 @@ void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
         printf("Removing window \"%s\" from namespace %zu\n",
                windows->data[j]->process_name, workspaces->data[i]->num);
 
-        cleanup_window(windows->data[j]);
-        windows->data[j] = NULL;
-        cleanup_workspace_windows(workspaces->data[i]);
+        windows_vec_remove(windows, j);
 
         return;
       }
     }
   }
-}
-
-void cleanup_workspace_windows(Workspace *workspace) {
-  WindowsVector *windows = malloc(sizeof(WindowsVector));
-  INIT_VECTOR(windows);
-
-  for (size_t i = 0; i < workspace->windows->size; i++) {
-    if (workspace->windows->data[i] != NULL) {
-      wnd_array_add(windows, workspace->windows->data[i]);
-    }
-  }
-
-  workspace->windows = windows;
 }
 
 void log_state(WmParams *wm_params) {
@@ -293,9 +278,9 @@ void log_state(WmParams *wm_params) {
       }
 
       Window *window = workspace->windows->data[j];
-      printf("  %s: position (l = %d t = %d r = %d b = %d)\n",
+      printf("  %s: position (l = %d t = %d r = %d b = %d), rid (%p)\n",
              window->process_name, window->w_rect.left, window->w_rect.top,
-             window->w_rect.right, window->w_rect.bottom);
+             window->w_rect.right, window->w_rect.bottom, window->runtime_id);
     }
   }
 
