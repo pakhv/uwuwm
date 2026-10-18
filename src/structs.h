@@ -43,6 +43,7 @@ typedef struct {
 typedef struct {
   size_t active_workspace;
   WorkspacesVector *workspaces;
+  LPARAM uiautomation;
 } WmParams;
 
 void workspaces_vec_add(WorkspacesVector *vec, Workspace *el);

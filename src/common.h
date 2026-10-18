@@ -16,9 +16,10 @@ size_t get_windows_number(WmParams *wm_params);
 
 Workspace *get_active_workspace(WmParams *wm_params);
 
-BOOL add_window(HWND hwnd, WindowsVector *windows);
+BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation);
 
-BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces);
+BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces,
+                   LPARAM uiautomation);
 
 void log_state(WmParams *wm_params);
 

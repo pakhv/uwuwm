@@ -9,7 +9,7 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
 
 void init(WmParams *wm_params) {
-  if (!init_uiautomation()) {
+  if (!init_uiautomation(wm_params)) {
     printf("Failed to initialize uiautomation");
     return;
   }
@@ -59,7 +59,7 @@ BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
     return FALSE;
   }
 
-  add_window(hwnd, active_workspace->windows);
+  add_window(hwnd, active_workspace->windows, wm_params->uiautomation);
 
   return TRUE;
 }

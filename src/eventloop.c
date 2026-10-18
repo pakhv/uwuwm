@@ -4,7 +4,6 @@
 #include <UIAutomationClient.h>
 
 static HWND g_hidden_wnd = NULL;
-IUIAutomation *ui_automation = NULL;
 
 typedef struct WindowsEventHandler {
   IUIAutomationEventHandlerVtbl *lp_vtbl;
@@ -64,18 +63,7 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   MSG msg = {0};
   BOOL m_ret;
 
-  while ((m_ret = GetMessage(&msg, NULL, 0, 0)) != 0) {
-    if (msg.message == WM_QUIT) {
-      break;
-    }
-    if (m_ret == -1) {
-      printf("Error reading message from the queue: %d\n", GetLastError());
-      break;
-    } else {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
-  }
+  getchar();
 
   printf("Successfully exited the event loop\n");
 
@@ -86,14 +74,14 @@ void register_windows_event_handler(IUIAutomation *ui_automation,
   free(handler);
 }
 
-BOOL init_uiautomation() {
+BOOL init_uiautomation(WmParams *wm_params) {
   CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
   HRESULT hr;
   hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-                        &IID_IUIAutomation, (void **)&ui_automation);
+                        &IID_IUIAutomation, (void **)&wm_params->uiautomation);
 
-  if (FAILED(hr) || ui_automation == NULL) {
+  if (FAILED(hr)) {
     return FALSE;
   }
 
@@ -112,28 +100,31 @@ void start_event_loop(WmParams *wm_params) {
     return;
   }
 
-  hr = IUIAutomation_GetRootElement(ui_automation, &root_el);
+  IUIAutomation *uiautomation = (IUIAutomation *)wm_params->uiautomation;
+
+  hr = IUIAutomation_GetRootElement(uiautomation, &root_el);
   if (FAILED(hr) || root_el == NULL) {
     goto Cleanup;
   }
 
-  register_windows_event_handler(ui_automation, root_el, wm_params);
+  register_windows_event_handler(uiautomation, root_el, wm_params);
 
 Cleanup:
   if (root_el != NULL) {
     IUIAutomationElement_Release(root_el);
   }
 
-  if (ui_automation != NULL) {
-    IUIAutomation_Release(ui_automation);
+  if (uiautomation != NULL) {
+    IUIAutomation_Release(uiautomation);
   }
 
   CoUninitialize();
 }
 
-HRESULT get_window_runtime_id(HWND hwnd, SAFEARRAY **rid) {
+HRESULT get_window_runtime_id(HWND hwnd, LPARAM uiautomation, SAFEARRAY **rid) {
   IUIAutomationElement *element = NULL;
-  HRESULT hr = IUIAutomation_ElementFromHandle(ui_automation, hwnd, &element);
+  HRESULT hr = IUIAutomation_ElementFromHandle((IUIAutomation *)uiautomation,
+                                               hwnd, &element);
 
   if (FAILED(hr)) {
     printf("Failed to get runtime id for a handle");
@@ -144,8 +135,10 @@ HRESULT get_window_runtime_id(HWND hwnd, SAFEARRAY **rid) {
   return hr;
 }
 
-HRESULT compare_runtime_ids(SAFEARRAY *rid1, SAFEARRAY *rid2, BOOL *result) {
-  return IUIAutomation_CompareRuntimeIds(ui_automation, rid1, rid2, result);
+HRESULT compare_runtime_ids(SAFEARRAY *rid1, SAFEARRAY *rid2,
+                            LPARAM uiautomation, BOOL *result) {
+  return IUIAutomation_CompareRuntimeIds((IUIAutomation *)uiautomation, rid1,
+                                         rid2, result);
 }
 
 STDMETHODIMP EventHandler_QueryInterface(IUIAutomationEventHandler *h,
@@ -200,7 +193,8 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *h,
         IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
 
     if (SUCCEEDED(hr)) {
-      if (!add_window(window, active_workspace->windows)) {
+      if (!add_window(window, active_workspace->windows,
+                      (LPARAM)handler->ui_automation)) {
         return S_OK;
       }
 
@@ -210,7 +204,8 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *h,
   }
 
   if (event_id == UIA_Window_WindowClosedEventId) {
-    if (!remove_window(rid, handler->wm_params->workspaces)) {
+    if (!remove_window(rid, handler->wm_params->workspaces,
+                       handler->wm_params->uiautomation)) {
       return S_OK;
     }
 

@@ -238,7 +238,7 @@ BOOL is_window_manageable(HWND hwnd) {
   return TRUE;
 }
 
-BOOL add_window(HWND hwnd, WindowsVector *windows) {
+BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation) {
   if (!is_window_manageable(hwnd)) {
     return FALSE;
   }
@@ -250,7 +250,7 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
 
   window->process_name = p_name;
   window->handle = hwnd;
-  get_window_runtime_id(hwnd, &window->runtime_id);
+  get_window_runtime_id(hwnd, uiautomation, &window->runtime_id);
 
   windows_vec_add(windows, window);
 
@@ -259,7 +259,8 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
   return TRUE;
 }
 
-BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
+BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces,
+                   LPARAM uiautomation) {
   BOOL same;
   HRESULT hr;
 
@@ -267,7 +268,8 @@ BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
     WindowsVector *windows = workspaces->data[i]->windows;
 
     for (size_t j = 0; j < windows->size; j++) {
-      hr = compare_runtime_ids(rid, windows->data[j]->runtime_id, &same);
+      hr = compare_runtime_ids(rid, windows->data[j]->runtime_id, uiautomation,
+                               &same);
 
       if (SUCCEEDED(hr) && same) {
         printf("Removing window \"%s\" from namespace %zu\n",
@@ -297,11 +299,11 @@ void log_state(WmParams *wm_params) {
       }
 
       Window *window = workspace->windows->data[j];
-      printf(
-          "  %s: position (l = %d t = %d r = %d b = %d), rid (%p) hwnd (%p)\n",
-          window->process_name, window->w_rect.left, window->w_rect.top,
-          window->w_rect.right, window->w_rect.bottom, window->runtime_id,
-          window->handle);
+      printf("  %s: position (l = %d t = %d r = %d b = %d); rid (%p); hwnd "
+             "(%p);\n",
+             window->process_name, window->w_rect.left, window->w_rect.top,
+             window->w_rect.right, window->w_rect.bottom, window->runtime_id,
+             window->handle);
     }
   }
 
@@ -317,7 +319,7 @@ BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params) {
 
     for (size_t j = 0; j < workspace->windows->size; j++) {
       hr = compare_runtime_ids(rid, workspace->windows->data[j]->runtime_id,
-                               &same);
+                               wm_params->uiautomation, &same);
       if (SUCCEEDED(hr) && same) {
         return TRUE;
       }
