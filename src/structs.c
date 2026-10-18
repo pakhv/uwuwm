@@ -25,12 +25,7 @@ void windows_vec_remove(WindowsVector *vec, size_t idx) {
     return;
   }
 
-  Window *window = vec->data[idx];
-
-  free(window->process_name);
-  window->handle = NULL;
-  window->process_name = NULL;
-  free(window);
+  cleanup_window(vec->data[idx]);
 
   for (size_t i = idx; i < vec->size - 1; i++) {
     vec->data[i] = vec->data[i + 1];
@@ -62,4 +57,11 @@ void cleanup(WmParams *wm_params) {
   workspaces->capacity = 0;
 
   free(workspaces);
+}
+
+void cleanup_window(Window *window) {
+  free(window->process_name);
+  window->handle = NULL;
+  window->process_name = NULL;
+  free(window);
 }

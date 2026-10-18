@@ -2,7 +2,9 @@
 
 void calculate_windows_init(WmParams *wm_params);
 
-void position_windows_init(WmParams *wm_params);
+void position_workspaces_windows(WmParams *wm_params);
+
+void calculate_workspace_windows(Workspace *workspace);
 
 BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible);
 
@@ -16,8 +18,12 @@ Workspace *get_active_workspace(WmParams *wm_params);
 
 BOOL add_window(HWND hwnd, WindowsVector *windows);
 
-void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces);
+BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces);
 
 void log_state(WmParams *wm_params);
 
 BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params);
+
+BOOL is_window_manageable(HWND hwnd);
+
+void cleanup_workspace_windows(Workspace *workspace);

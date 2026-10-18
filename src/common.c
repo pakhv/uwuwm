@@ -3,33 +3,37 @@
 #include <dwmapi.h>
 
 void calculate_windows_init(WmParams *params) {
+  for (size_t i = 0; i < params->workspaces->size; i++) {
+    Workspace *workspace = params->workspaces->data[i];
+
+    calculate_workspace_windows(workspace);
+  }
+}
+
+void calculate_workspace_windows(Workspace *workspace) {
   WindowsVector *v_windows = malloc(sizeof(WindowsVector));
   INIT_VECTOR(v_windows)
 
-  HMONITOR monitor;
   MONITORINFO m_info;
+  m_info.cbSize = sizeof(MONITORINFO);
 
-  for (size_t i = 0; i < params->workspaces->size; i++) {
-    Workspace *workspace = params->workspaces->data[i];
-    m_info.cbSize = sizeof(MONITORINFO);
-
-    if (!GetMonitorInfo(workspace->monitor, &m_info)) {
-      printf("Failed to retrieve information about monitor for workspace %zu",
-             workspace->num);
-      continue;
-    }
-
-    for (size_t i = 0; i < workspace->windows->size; i++) {
-      Window *window = workspace->windows->data[i];
-
-      if (!IsIconic(window->handle)) {
-        windows_vec_add(v_windows, window);
-      }
-    }
-
-    calculate_windows(v_windows, &m_info.rcWork);
+  if (!GetMonitorInfo(workspace->monitor, &m_info)) {
+    printf("Failed to retrieve information about monitor for workspace %zu",
+           workspace->num);
+    goto Cleanup;
   }
 
+  for (size_t i = 0; i < workspace->windows->size; i++) {
+    Window *window = workspace->windows->data[i];
+
+    if (!IsIconic(window->handle)) {
+      windows_vec_add(v_windows, window);
+    }
+  }
+
+  calculate_windows(v_windows, &m_info.rcWork);
+
+Cleanup:
   free(v_windows);
 }
 
@@ -54,7 +58,7 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
                      .bottom = m_rect->bottom};
 
     if (!map_to_window_coords(window, &position)) {
-      printf("Failed to get window gaps %s", windows->data[i]->process_name);
+      printf("Failed to get window gaps %s\n", windows->data[i]->process_name);
       continue;
     }
 
@@ -64,12 +68,12 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   return TRUE;
 }
 
-void position_windows_init(WmParams *wm_params) {
+void position_workspaces_windows(WmParams *wm_params) {
   size_t w_num = get_windows_number(wm_params);
 
   HDWP hdwp = BeginDeferWindowPos(w_num);
   if (hdwp == NULL) {
-    printf("Failed to position windows \n");
+    printf("Failed to position windows\n");
     return;
   }
 
@@ -209,13 +213,24 @@ Workspace *get_active_workspace(WmParams *wm_params) {
   return NULL;
 }
 
-BOOL add_window(HWND hwnd, WindowsVector *windows) {
+BOOL is_window_manageable(HWND hwnd) {
   if (!IsWindowVisible(hwnd)) {
     return FALSE;
   }
 
+  if (GetWindowTextLength(hwnd) == 0) {
+    return FALSE;
+  }
+
+  RECT rect = {0};
+  GetWindowRect(hwnd, &rect);
+  printf("%d %d %d %d\n", rect.left, rect.right, rect.top, rect.bottom);
+
   LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-  if (exStyle & WS_EX_TOOLWINDOW) {
+  printf("%lld\n", exStyle);
+
+  if (exStyle & WS_EX_TOOLWINDOW || exStyle & WS_SYSMENU == 0 ||
+      exStyle & WS_EX_APPWINDOW == 0) {
     return FALSE;
   }
 
@@ -223,6 +238,14 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
   HRESULT hr =
       DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(cloaked));
   if (SUCCEEDED(hr) && cloaked != 0) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+BOOL add_window(HWND hwnd, WindowsVector *windows) {
+  if (!is_window_manageable(hwnd)) {
     return FALSE;
   }
 
@@ -242,7 +265,7 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
   return TRUE;
 }
 
-void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
+BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
   BOOL same;
   HRESULT hr;
 
@@ -258,10 +281,12 @@ void remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces) {
 
         windows_vec_remove(windows, j);
 
-        return;
+        return TRUE;
       }
     }
   }
+
+  return FALSE;
 }
 
 void log_state(WmParams *wm_params) {
@@ -278,9 +303,11 @@ void log_state(WmParams *wm_params) {
       }
 
       Window *window = workspace->windows->data[j];
-      printf("  %s: position (l = %d t = %d r = %d b = %d), rid (%p)\n",
-             window->process_name, window->w_rect.left, window->w_rect.top,
-             window->w_rect.right, window->w_rect.bottom, window->runtime_id);
+      printf(
+          "  %s: position (l = %d t = %d r = %d b = %d), rid (%p) hwnd (%p)\n",
+          window->process_name, window->w_rect.left, window->w_rect.top,
+          window->w_rect.right, window->w_rect.bottom, window->runtime_id,
+          window->handle);
     }
   }
 
@@ -304,4 +331,22 @@ BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params) {
   }
 
   return FALSE;
+}
+
+// not used
+void cleanup_workspace_windows(Workspace *workspace) {
+  BOOL has_invalid_windows = TRUE;
+
+  while (has_invalid_windows) {
+    has_invalid_windows = FALSE;
+
+    for (size_t i = 0; i < workspace->windows->size; i++) {
+      if (!is_window_manageable(workspace->windows->data[i]->handle)) {
+        windows_vec_remove(workspace->windows, i);
+        has_invalid_windows = TRUE;
+
+        break;
+      }
+    }
+  }
 }

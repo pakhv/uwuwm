@@ -29,7 +29,7 @@ void main(void) {
   printf("Workspaces num: %zu\n", wm_params.workspaces->size);
 
   calculate_windows_init(&wm_params);
-  position_windows_init(&wm_params);
+  position_workspaces_windows(&wm_params);
 
   start_event_loop(&wm_params);
 

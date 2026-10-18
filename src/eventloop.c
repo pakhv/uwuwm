@@ -188,17 +188,27 @@ STDMETHODIMP EventHandler_HandleAutomationEvent(IUIAutomationEventHandler *this,
   Workspace *active_workspace = get_active_workspace(e_handler->wm_params);
 
   if (event_id == UIA_Window_WindowOpenedEventId &&
-      !is_window_tracked(window, e_handler->wm_params)) {
+      !is_window_tracked(rid, e_handler->wm_params)) {
     HRESULT hr =
         IUIAutomationElement_get_CurrentNativeWindowHandle(sender, &window);
 
     if (SUCCEEDED(hr)) {
-      add_window(window, active_workspace->windows);
+      if (!add_window(window, active_workspace->windows)) {
+        return S_OK;
+      }
+
+      calculate_workspace_windows(active_workspace);
+      position_workspaces_windows(e_handler->wm_params);
     }
   }
 
   if (event_id == UIA_Window_WindowClosedEventId) {
-    remove_window(rid, e_handler->wm_params->workspaces);
+    if (!remove_window(rid, e_handler->wm_params->workspaces)) {
+      return S_OK;
+    }
+
+    calculate_workspace_windows(active_workspace);
+    position_workspaces_windows(e_handler->wm_params);
   }
 
   log_state(e_handler->wm_params);
