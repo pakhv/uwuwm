@@ -9,11 +9,6 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param);
 
 void init(WmParams *wm_params) {
-  if (!init_uiautomation(wm_params)) {
-    printf("Failed to initialize uiautomation");
-    return;
-  }
-
   wm_params->active_workspace = 1;
   wm_params->workspaces = malloc(sizeof(WorkspacesVector));
   INIT_VECTOR(wm_params->workspaces)
@@ -23,29 +18,17 @@ void init(WmParams *wm_params) {
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 }
 
-DWORD WINAPI start_uwuwm(void *params) {
-  WmParams *wm_params = (WmParams *)params;
-
-  init(wm_params);
-
-  printf("Windows num: %zu\n", get_windows_number(wm_params));
-  printf("Workspaces num: %zu\n", wm_params->workspaces->size);
-
-  calculate_windows_init(wm_params);
-  position_workspaces_windows(wm_params);
-
-  start_event_loop(wm_params);
-
-  return 0;
-}
-
 void main(void) {
   WmParams wm_params = {0};
+  init(&wm_params);
 
-  HANDLE th = (HANDLE)_beginthreadex(NULL, 0, start_uwuwm, &wm_params, 0, NULL);
+  printf("Windows num: %zu\n", get_windows_number(&wm_params));
+  printf("Workspaces num: %zu\n", wm_params.workspaces->size);
 
-  WaitForSingleObject(th, INFINITE);
-  CloseHandle(th);
+  calculate_windows_init(&wm_params);
+  position_workspaces_windows(&wm_params);
+
+  start_event_loop(&wm_params);
 
   cleanup(&wm_params);
 }
@@ -59,7 +42,7 @@ BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
     return FALSE;
   }
 
-  add_window(hwnd, active_workspace->windows, wm_params->uiautomation);
+  add_window(hwnd, active_workspace->windows);
 
   return TRUE;
 }

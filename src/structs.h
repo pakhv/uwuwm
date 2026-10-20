@@ -18,7 +18,6 @@
 typedef struct {
   HWND handle;
   char *process_name;
-  SAFEARRAY *runtime_id;
   RECT w_rect;
 } Window;
 
@@ -43,7 +42,6 @@ typedef struct {
 typedef struct {
   size_t active_workspace;
   WorkspacesVector *workspaces;
-  LPARAM uiautomation;
 } WmParams;
 
 void workspaces_vec_add(WorkspacesVector *vec, Workspace *el);

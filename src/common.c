@@ -1,5 +1,4 @@
 #include "common.h"
-#include "eventloop.h"
 #include <dwmapi.h>
 
 void calculate_windows_init(WmParams *params) {
@@ -222,9 +221,10 @@ BOOL is_window_manageable(HWND hwnd) {
     return FALSE;
   }
 
+  LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
   LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
   if (exStyle & WS_EX_TOOLWINDOW || exStyle & WS_SYSMENU == 0 ||
-      exStyle & WS_EX_APPWINDOW == 0) {
+      exStyle & WS_EX_APPWINDOW == 0 || !(style & WS_CAPTION)) {
     return FALSE;
   }
 
@@ -238,7 +238,7 @@ BOOL is_window_manageable(HWND hwnd) {
   return TRUE;
 }
 
-BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation) {
+BOOL add_window(HWND hwnd, WindowsVector *windows) {
   if (!is_window_manageable(hwnd)) {
     return FALSE;
   }
@@ -250,7 +250,6 @@ BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation) {
 
   window->process_name = p_name;
   window->handle = hwnd;
-  get_window_runtime_id(hwnd, uiautomation, &window->runtime_id);
 
   windows_vec_add(windows, window);
 
@@ -259,19 +258,12 @@ BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation) {
   return TRUE;
 }
 
-BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces,
-                   LPARAM uiautomation) {
-  BOOL same;
-  HRESULT hr;
-
+BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
   for (size_t i = 0; i < workspaces->size; i++) {
     WindowsVector *windows = workspaces->data[i]->windows;
 
     for (size_t j = 0; j < windows->size; j++) {
-      hr = compare_runtime_ids(rid, windows->data[j]->runtime_id, uiautomation,
-                               &same);
-
-      if (SUCCEEDED(hr) && same) {
+      if (windows->data[j]->handle == hwnd) {
         printf("Removing window \"%s\" from namespace %zu\n",
                windows->data[j]->process_name, workspaces->data[i]->num);
 
@@ -299,28 +291,21 @@ void log_state(WmParams *wm_params) {
       }
 
       Window *window = workspace->windows->data[j];
-      printf("  %s: position (l = %d t = %d r = %d b = %d); rid (%p); hwnd "
-             "(%p);\n",
+      printf("  %s: position (l = %d t = %d r = %d b = %d); hwnd (%p);\n",
              window->process_name, window->w_rect.left, window->w_rect.top,
-             window->w_rect.right, window->w_rect.bottom, window->runtime_id,
-             window->handle);
+             window->w_rect.right, window->w_rect.bottom, window->handle);
     }
   }
 
   printf("\n-------\n");
 }
 
-BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params) {
-  BOOL same;
-  HRESULT hr;
-
+BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
   for (size_t i = 0; i < wm_params->workspaces->size; i++) {
     Workspace *workspace = wm_params->workspaces->data[i];
 
     for (size_t j = 0; j < workspace->windows->size; j++) {
-      hr = compare_runtime_ids(rid, workspace->windows->data[j]->runtime_id,
-                               wm_params->uiautomation, &same);
-      if (SUCCEEDED(hr) && same) {
+      if (workspace->windows->data[j]->handle == hwnd) {
         return TRUE;
       }
     }

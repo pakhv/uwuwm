@@ -16,14 +16,13 @@ size_t get_windows_number(WmParams *wm_params);
 
 Workspace *get_active_workspace(WmParams *wm_params);
 
-BOOL add_window(HWND hwnd, WindowsVector *windows, LPARAM uiautomation);
+BOOL add_window(HWND hwnd, WindowsVector *windows);
 
-BOOL remove_window(SAFEARRAY *rid, WorkspacesVector *workspaces,
-                   LPARAM uiautomation);
+BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces);
 
 void log_state(WmParams *wm_params);
 
-BOOL is_window_tracked(SAFEARRAY *rid, WmParams *wm_params);
+BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);
 
 BOOL is_window_manageable(HWND hwnd);
 
