@@ -124,6 +124,7 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
                        SWP_NOZORDER | SWP_NOACTIVATE);
 
     if (def_hdpw == NULL) {
+      print_last_error();
       return FALSE;
     }
   }
@@ -213,11 +214,11 @@ Workspace *get_active_workspace(WmParams *wm_params) {
 }
 
 BOOL is_window_manageable(HWND hwnd) {
-  if (!IsWindowVisible(hwnd)) {
+  if (!IsWindow(hwnd)) {
     return FALSE;
   }
 
-  if (GetWindowTextLength(hwnd) == 0) {
+  if (!IsWindowVisible(hwnd)) {
     return FALSE;
   }
 
@@ -314,20 +315,12 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
   return FALSE;
 }
 
-// not used
-void cleanup_workspace_windows(Workspace *workspace) {
-  BOOL has_invalid_windows = TRUE;
-
-  while (has_invalid_windows) {
-    has_invalid_windows = FALSE;
-
-    for (size_t i = 0; i < workspace->windows->size; i++) {
-      if (!is_window_manageable(workspace->windows->data[i]->handle)) {
-        windows_vec_remove(workspace->windows, i);
-        has_invalid_windows = TRUE;
-
-        break;
-      }
-    }
-  }
+void print_last_error() {
+  LPVOID lpMsgBuf;
+  FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                    FORMAT_MESSAGE_IGNORE_INSERTS,
+                NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                (LPTSTR)&lpMsgBuf, 0, NULL);
+  wprintf(L"Last error: %hs", (LPCTSTR)lpMsgBuf);
+  LocalFree(lpMsgBuf);
 }

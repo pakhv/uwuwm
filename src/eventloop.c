@@ -23,8 +23,8 @@ void start_event_loop(WmParams *wm_params) {
   g_wm_params = wm_params;
 
   HWINEVENTHOOK win_hook = SetWinEventHook(
-      EVENT_OBJECT_CREATE, EVENT_OBJECT_SHOW, NULL, handle_win_events, 0, 0,
-      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+      EVENT_OBJECT_CREATE, EVENT_OBJECT_UNCLOAKED, NULL, handle_win_events, 0,
+      0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
   MSG msg = {0};
   while (GetMessage(&msg, NULL, 0, 0)) {
@@ -43,7 +43,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     return;
   }
 
-  if (event == EVENT_OBJECT_SHOW) {
+  if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
     Workspace *active_workspace = get_active_workspace(g_wm_params);
 
     if (!is_window_tracked(hwnd, g_wm_params)) {
@@ -56,7 +56,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     }
   }
 
-  if (event == EVENT_OBJECT_DESTROY) {
+  if (event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED) {
     if (!remove_window(hwnd, g_wm_params->workspaces)) {
       return;
     }

@@ -26,4 +26,4 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);
 
 BOOL is_window_manageable(HWND hwnd);
 
-void cleanup_workspace_windows(Workspace *workspace);
+void print_last_error();
