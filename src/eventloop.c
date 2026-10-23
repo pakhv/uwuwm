@@ -23,8 +23,8 @@ void start_event_loop(WmParams *wm_params) {
   g_wm_params = wm_params;
 
   HWINEVENTHOOK win_hook = SetWinEventHook(
-      EVENT_SYSTEM_MINIMIZESTART, EVENT_OBJECT_UNCLOAKED, NULL,
-      handle_win_events, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+      EVENT_SYSTEM_MOVESIZEEND, EVENT_OBJECT_UNCLOAKED, NULL, handle_win_events,
+      0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
   MSG msg = {0};
   while (GetMessage(&msg, NULL, 0, 0)) {
@@ -39,9 +39,9 @@ void start_event_loop(WmParams *wm_params) {
 
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
                        LONG c_id, DWORD t_id, DWORD time) {
-  if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
-    return;
-  }
+  // if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
+  //   return;
+  // }
 
   if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
     Workspace *active_workspace = get_active_workspace(g_wm_params);
@@ -67,7 +67,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   if (event == EVENT_SYSTEM_MINIMIZESTART ||
-      event == EVENT_SYSTEM_MINIMIZEEND) {
+      event == EVENT_SYSTEM_MINIMIZEEND || event == EVENT_SYSTEM_MOVESIZEEND) {
     Workspace *active_workspace = get_active_workspace(g_wm_params);
     calculate_workspace_windows(active_workspace);
     position_workspaces_windows(g_wm_params);
