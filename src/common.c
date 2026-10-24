@@ -336,7 +336,8 @@ void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
   // TODO: moved
 
   RECT w_rect = {0};
-  if (!GetWindowRect(hwnd, &w_rect)) {
+  if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &w_rect,
+                                   sizeof(RECT)))) {
     return;
   }
 
@@ -347,7 +348,11 @@ void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
   }
 
   for (size_t j = 0; j < active_workspace->windows->size; j++) {
-    if (active_workspace->windows->data[j]->handle == hwnd) {
+    BOOL same_width = (active_workspace->windows->data[j]->w_rect.right -
+                       active_workspace->windows->data[j]->w_rect.left) ==
+                      (w_rect.right - w_rect.left);
+
+    if (active_workspace->windows->data[j]->handle == hwnd && !same_width) {
       active_workspace->windows->data[j]->user_sized = TRUE;
       active_workspace->windows->data[j]->w_rect = w_rect;
       break;

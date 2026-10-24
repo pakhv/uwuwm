@@ -37,12 +37,24 @@ void start_event_loop(WmParams *wm_params) {
   UnhookWinEvent(win_hook);
 }
 
+BOOL is_known_event(DWORD event) {
+  return event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED ||
+         event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED ||
+         event == EVENT_SYSTEM_MINIMIZESTART ||
+         event == EVENT_SYSTEM_MINIMIZEEND || event == EVENT_SYSTEM_MOVESIZEEND;
+}
+
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
                        LONG c_id, DWORD t_id, DWORD time) {
   if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
     return;
   }
 
+  if (!is_known_event(event)) {
+    return;
+  }
+
+  // window opened
   if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
     if (is_window_tracked(hwnd, g_wm_params)) {
       return;
@@ -52,27 +64,26 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     if (!add_window(hwnd, active_workspace->windows)) {
       return;
     }
-
-    calculate_and_position_active_workspace(g_wm_params);
   }
 
+  // window closed
   if (event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED) {
     if (!remove_window(hwnd, g_wm_params->workspaces)) {
       return;
     }
-
-    calculate_and_position_active_workspace(g_wm_params);
   }
 
+  // window minimized/maximized
   if (event == EVENT_SYSTEM_MINIMIZESTART ||
       event == EVENT_SYSTEM_MINIMIZEEND) {
-    calculate_and_position_active_workspace(g_wm_params);
   }
 
+  // window resized/moved
   if (event == EVENT_SYSTEM_MOVESIZEEND) {
     window_moved_or_resized(hwnd, g_wm_params);
-    calculate_and_position_active_workspace(g_wm_params);
   }
+
+  calculate_and_position_active_workspace(g_wm_params);
 }
 
 void create_hidden_window(WNDCLASSEX *wc) {
