@@ -1,5 +1,7 @@
 #include "structs.h"
 
+void calculate_and_position_active_workspace(WmParams *params);
+
 void calculate_windows_init(WmParams *wm_params);
 
 void position_workspaces_windows(WmParams *wm_params);
@@ -25,5 +27,11 @@ void log_state(WmParams *wm_params);
 BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);
 
 BOOL is_window_manageable(HWND hwnd);
+
+void window_moved_or_resized(HWND hwnd, WmParams *wm_params);
+
+size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect);
+
+void check_all_windows_user_sized(Workspace *active_workspace, HWND hwnd);
 
 void print_last_error();

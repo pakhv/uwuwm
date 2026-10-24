@@ -19,6 +19,7 @@ typedef struct {
   HWND handle;
   char *process_name;
   RECT w_rect;
+  BOOL user_sized;
 } Window;
 
 typedef struct {

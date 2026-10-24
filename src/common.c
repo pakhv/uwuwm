@@ -1,6 +1,13 @@
 #include "common.h"
 #include <dwmapi.h>
 
+void calculate_and_position_active_workspace(WmParams *params) {
+  Workspace *active_workspace = get_active_workspace(params);
+
+  calculate_workspace_windows(active_workspace);
+  position_workspaces_windows(params);
+}
+
 void calculate_windows_init(WmParams *params) {
   for (size_t i = 0; i < params->workspaces->size; i++) {
     Workspace *workspace = params->workspaces->data[i];
@@ -41,18 +48,26 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
     return TRUE;
   }
 
-  size_t w_width = (m_rect->right - m_rect->left) / windows->size;
+  size_t w_width = get_window_auto_width(windows, m_rect);
   size_t w_height = m_rect->bottom - m_rect->top;
+
+  size_t l_shift = m_rect->left;
 
   for (size_t i = 0; i < windows->size; i++) {
     HWND window = windows->data[i]->handle;
 
+    // TODO: move out of here
     if (IsZoomed(window)) {
       ShowWindow(window, SW_RESTORE);
     }
 
-    RECT position = {.left = m_rect->left + i * w_width,
-                     .right = m_rect->left + (i + 1) * w_width,
+    size_t width =
+        windows->data[i]->user_sized
+            ? windows->data[i]->w_rect.right - windows->data[i]->w_rect.left
+            : w_width;
+
+    RECT position = {.left = l_shift,
+                     .right = l_shift + width,
                      .top = m_rect->top,
                      .bottom = m_rect->bottom};
 
@@ -62,6 +77,7 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
     }
 
     windows->data[i]->w_rect = position;
+    l_shift += width;
   }
 
   return TRUE;
@@ -251,6 +267,7 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
 
   window->process_name = p_name;
   window->handle = hwnd;
+  window->user_sized = FALSE;
 
   windows_vec_add(windows, window);
 
@@ -313,6 +330,79 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
   }
 
   return FALSE;
+}
+
+void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
+  // TODO: moved
+
+  RECT w_rect = {0};
+  if (!GetWindowRect(hwnd, &w_rect)) {
+    return;
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  if (active_workspace->windows->size == 1) {
+    active_workspace->windows->data[0]->user_sized = FALSE;
+  }
+
+  for (size_t j = 0; j < active_workspace->windows->size; j++) {
+    if (active_workspace->windows->data[j]->handle == hwnd) {
+      active_workspace->windows->data[j]->user_sized = TRUE;
+      active_workspace->windows->data[j]->w_rect = w_rect;
+      break;
+    }
+  }
+
+  check_all_windows_user_sized(active_workspace, hwnd);
+}
+
+size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect) {
+  size_t m_width = m_rect->right - m_rect->left;
+  size_t user_sized_count = 0;
+  size_t reserved_width = 0;
+
+  WindowsVector *user_sized_windows = malloc(sizeof(WindowsVector));
+  INIT_VECTOR(user_sized_windows);
+
+  for (size_t i = 0; i < windows->size; i++) {
+    if (windows->data[i]->user_sized) {
+      user_sized_count++;
+      reserved_width +=
+          windows->data[i]->w_rect.right - windows->data[i]->w_rect.left;
+      windows_vec_add(user_sized_windows, windows->data[i]);
+    }
+  }
+
+  if (reserved_width > m_width) {
+    for (size_t i = 0; i < user_sized_windows->size; i++) {
+      user_sized_windows->data[i]->user_sized = FALSE;
+    }
+    reserved_width = 0;
+    user_sized_count = 0;
+  }
+
+  free(user_sized_windows);
+
+  return (m_width - reserved_width) / (windows->size - user_sized_count);
+}
+
+void check_all_windows_user_sized(Workspace *active_workspace, HWND hwnd) {
+  size_t user_sized_count = 0;
+
+  for (size_t j = 0; j < active_workspace->windows->size; j++) {
+    if (active_workspace->windows->data[j]->user_sized) {
+      user_sized_count++;
+    }
+  }
+
+  if (active_workspace->windows->size == user_sized_count) {
+    for (size_t j = 0; j < active_workspace->windows->size; j++) {
+      if (active_workspace->windows->data[j]->handle != hwnd) {
+        active_workspace->windows->data[j]->user_sized = FALSE;
+      }
+    }
+  }
 }
 
 void print_last_error() {

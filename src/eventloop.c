@@ -39,21 +39,21 @@ void start_event_loop(WmParams *wm_params) {
 
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
                        LONG c_id, DWORD t_id, DWORD time) {
-  // if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
-  //   return;
-  // }
+  if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
+    return;
+  }
 
   if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
-    Workspace *active_workspace = get_active_workspace(g_wm_params);
-
-    if (!is_window_tracked(hwnd, g_wm_params)) {
-      if (!add_window(hwnd, active_workspace->windows)) {
-        return;
-      }
-
-      calculate_workspace_windows(active_workspace);
-      position_workspaces_windows(g_wm_params);
+    if (is_window_tracked(hwnd, g_wm_params)) {
+      return;
     }
+
+    Workspace *active_workspace = get_active_workspace(g_wm_params);
+    if (!add_window(hwnd, active_workspace->windows)) {
+      return;
+    }
+
+    calculate_and_position_active_workspace(g_wm_params);
   }
 
   if (event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED) {
@@ -61,16 +61,17 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
       return;
     }
 
-    Workspace *active_workspace = get_active_workspace(g_wm_params);
-    calculate_workspace_windows(active_workspace);
-    position_workspaces_windows(g_wm_params);
+    calculate_and_position_active_workspace(g_wm_params);
   }
 
   if (event == EVENT_SYSTEM_MINIMIZESTART ||
-      event == EVENT_SYSTEM_MINIMIZEEND || event == EVENT_SYSTEM_MOVESIZEEND) {
-    Workspace *active_workspace = get_active_workspace(g_wm_params);
-    calculate_workspace_windows(active_workspace);
-    position_workspaces_windows(g_wm_params);
+      event == EVENT_SYSTEM_MINIMIZEEND) {
+    calculate_and_position_active_workspace(g_wm_params);
+  }
+
+  if (event == EVENT_SYSTEM_MOVESIZEEND) {
+    window_moved_or_resized(hwnd, g_wm_params);
+    calculate_and_position_active_workspace(g_wm_params);
   }
 }
 
