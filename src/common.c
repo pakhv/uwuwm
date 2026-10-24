@@ -56,11 +56,6 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   for (size_t i = 0; i < windows->size; i++) {
     HWND window = windows->data[i]->handle;
 
-    // TODO: move out of here
-    if (IsZoomed(window)) {
-      ShowWindow(window, SW_RESTORE);
-    }
-
     size_t width =
         windows->data[i]->user_sized
             ? windows->data[i]->w_rect.right - windows->data[i]->w_rect.left
@@ -70,11 +65,6 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
                      .right = l_shift + width,
                      .top = m_rect->top,
                      .bottom = m_rect->bottom};
-
-    if (!map_to_window_coords(window, &position)) {
-      printf("Failed to get window gaps %s\n", windows->data[i]->process_name);
-      continue;
-    }
 
     windows->data[i]->w_rect = position;
     l_shift += width;
@@ -123,6 +113,11 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
   for (size_t i = 0; i < windows->size; i++) {
     Window *window = windows->data[i];
     RECT w_rect = window->w_rect;
+
+    if (!map_to_window_coords(window->handle, &w_rect)) {
+      printf("Failed to get window gaps %s\n", windows->data[i]->process_name);
+      continue;
+    }
 
     if (IsZoomed(window->handle)) {
       ShowWindow(window->handle, SW_RESTORE);
@@ -271,6 +266,10 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
 
   windows_vec_add(windows, window);
 
+  if (IsZoomed(window->handle)) {
+    ShowWindow(window->handle, SW_RESTORE);
+  }
+
   printf("Added window with process name \"%s\"\n", window->process_name);
 
   return TRUE;
@@ -332,27 +331,88 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
   return FALSE;
 }
 
-void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
-  // TODO: moved
+void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params) {
+  int w_idx = -1;
 
+  Workspace *active_workspace = get_active_workspace(wm_params);
+  for (size_t i = 0; i < active_workspace->windows->size; i++) {
+    if (active_workspace->windows->data[i]->handle == hwnd) {
+      w_idx = i;
+      break;
+    }
+  }
+
+  if (w_idx < 0) {
+    printf("Couldn't find a window to move\n");
+    return;
+  }
+
+  Window *window = active_workspace->windows->data[w_idx];
+  // TODO: user can drag a window to a workspace on another monitor
+
+  BOOL same_width = (window->w_rect.right - window->w_rect.left) ==
+                    (w_rect.right - w_rect.left);
+  if (!same_width) {
+    return;
+  }
+
+  int s_idx = -1;
+  for (size_t i = 0; i < active_workspace->windows->size; i++) {
+    if (i == w_idx) {
+      continue;
+    }
+
+    Window *cur_window = active_workspace->windows->data[i];
+
+    size_t mid_point = (cur_window->w_rect.right + cur_window->w_rect.left) / 2;
+    BOOL swap = i < w_idx ? mid_point >= w_rect.left
+                          : cur_window->w_rect.left <= w_rect.left;
+    if (swap) {
+      s_idx = i;
+
+      if (s_idx < w_idx) {
+        break;
+      }
+    }
+  }
+
+  if (s_idx < 0) {
+    return;
+  }
+
+  if (w_idx - s_idx > 0) {
+    for (size_t i = w_idx; i > s_idx; i--) {
+      active_workspace->windows->data[i] =
+          active_workspace->windows->data[i - 1];
+    }
+  } else {
+    for (size_t i = w_idx; i < s_idx; i++) {
+      active_workspace->windows->data[i] =
+          active_workspace->windows->data[i + 1];
+    }
+  }
+
+  active_workspace->windows->data[s_idx] = window;
+}
+
+void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
   RECT w_rect = {0};
   if (FAILED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &w_rect,
                                    sizeof(RECT)))) {
     return;
   }
 
+  move_window(hwnd, w_rect, wm_params);
+
   Workspace *active_workspace = get_active_workspace(wm_params);
 
-  if (active_workspace->windows->size == 1) {
-    active_workspace->windows->data[0]->user_sized = FALSE;
-  }
-
   for (size_t j = 0; j < active_workspace->windows->size; j++) {
-    BOOL same_width = (active_workspace->windows->data[j]->w_rect.right -
-                       active_workspace->windows->data[j]->w_rect.left) ==
-                      (w_rect.right - w_rect.left);
+    BOOL width_changed = active_workspace->windows->data[j]->handle == hwnd &&
+                         ((active_workspace->windows->data[j]->w_rect.right -
+                           active_workspace->windows->data[j]->w_rect.left) !=
+                          (w_rect.right - w_rect.left));
 
-    if (active_workspace->windows->data[j]->handle == hwnd && !same_width) {
+    if (width_changed) {
       active_workspace->windows->data[j]->user_sized = TRUE;
       active_workspace->windows->data[j]->w_rect = w_rect;
       break;
@@ -379,7 +439,7 @@ size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect) {
     }
   }
 
-  if (reserved_width > m_width) {
+  if (reserved_width > m_width || windows->size == user_sized_count) {
     for (size_t i = 0; i < user_sized_windows->size; i++) {
       user_sized_windows->data[i]->user_sized = FALSE;
     }
