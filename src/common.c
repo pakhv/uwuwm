@@ -1,6 +1,17 @@
 #include "common.h"
 #include <dwmapi.h>
 
+BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect);
+BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible);
+BOOL is_window_manageable(HWND hwnd);
+BOOL window_width_changed(HWND hwnd, RECT w_rect, WmParams *wm_params);
+void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params);
+
+void check_all_windows_user_sized(Workspace *active_workspace, HWND hwnd);
+BOOL map_to_window_coords(HWND hwnd, LPRECT t_rect);
+size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect);
+void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx);
+
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
 
@@ -331,6 +342,35 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params) {
   return FALSE;
 }
 
+BOOL window_width_changed(HWND hwnd, RECT w_rect, WmParams *wm_params) {
+  Workspace *active_workspace = get_active_workspace(wm_params);
+  Window *window = NULL;
+
+  for (size_t i = 0; i < active_workspace->windows->size; i++) {
+    if (active_workspace->windows->data[i]->handle == hwnd) {
+      window = active_workspace->windows->data[i];
+      break;
+    }
+  }
+
+  if (window == NULL) {
+    printf("window_width_changed: Couldn't get window\n");
+    return FALSE;
+  }
+
+  BOOL same_width = (window->w_rect.right - window->w_rect.left) ==
+                    (w_rect.right - w_rect.left);
+
+  if (!same_width) {
+    window->user_sized = TRUE;
+    window->w_rect = w_rect;
+
+    check_all_windows_user_sized(active_workspace, hwnd);
+  }
+
+  return !same_width;
+}
+
 void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params) {
   int w_idx = -1;
 
@@ -347,14 +387,8 @@ void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params) {
     return;
   }
 
-  Window *window = active_workspace->windows->data[w_idx];
   // TODO: user can drag a window to a workspace on another monitor
-
-  BOOL same_width = (window->w_rect.right - window->w_rect.left) ==
-                    (w_rect.right - w_rect.left);
-  if (!same_width) {
-    return;
-  }
+  Window *window = active_workspace->windows->data[w_idx];
 
   int s_idx = -1;
   for (size_t i = 0; i < active_workspace->windows->size; i++) {
@@ -380,19 +414,7 @@ void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params) {
     return;
   }
 
-  if (w_idx - s_idx > 0) {
-    for (size_t i = w_idx; i > s_idx; i--) {
-      active_workspace->windows->data[i] =
-          active_workspace->windows->data[i - 1];
-    }
-  } else {
-    for (size_t i = w_idx; i < s_idx; i++) {
-      active_workspace->windows->data[i] =
-          active_workspace->windows->data[i + 1];
-    }
-  }
-
-  active_workspace->windows->data[s_idx] = window;
+  rearrange_windows(active_workspace->windows, w_idx, s_idx);
 }
 
 void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
@@ -402,24 +424,9 @@ void window_moved_or_resized(HWND hwnd, WmParams *wm_params) {
     return;
   }
 
-  move_window(hwnd, w_rect, wm_params);
-
-  Workspace *active_workspace = get_active_workspace(wm_params);
-
-  for (size_t j = 0; j < active_workspace->windows->size; j++) {
-    BOOL width_changed = active_workspace->windows->data[j]->handle == hwnd &&
-                         ((active_workspace->windows->data[j]->w_rect.right -
-                           active_workspace->windows->data[j]->w_rect.left) !=
-                          (w_rect.right - w_rect.left));
-
-    if (width_changed) {
-      active_workspace->windows->data[j]->user_sized = TRUE;
-      active_workspace->windows->data[j]->w_rect = w_rect;
-      break;
-    }
+  if (!window_width_changed(hwnd, w_rect, wm_params)) {
+    move_window(hwnd, w_rect, wm_params);
   }
-
-  check_all_windows_user_sized(active_workspace, hwnd);
 }
 
 size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect) {
@@ -468,6 +475,22 @@ void check_all_windows_user_sized(Workspace *active_workspace, HWND hwnd) {
       }
     }
   }
+}
+
+void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx) {
+  Window *window = windows->data[w_idx];
+
+  if ((w_idx - s_idx) > 0) {
+    for (size_t i = w_idx; i > s_idx; i--) {
+      windows->data[i] = windows->data[i - 1];
+    }
+  } else {
+    for (size_t i = w_idx; i < s_idx; i++) {
+      windows->data[i] = windows->data[i + 1];
+    }
+  }
+
+  windows->data[s_idx] = window;
 }
 
 void print_last_error() {
