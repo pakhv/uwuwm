@@ -305,6 +305,56 @@ BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
   return FALSE;
 }
 
+void set_active_workspace(HWND hwnd, WmParams *wm_params) {
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    for (size_t j = 0; j < wm_params->workspaces->data[i]->windows->size; j++) {
+      if (wm_params->workspaces->data[i]->windows->data[j]->handle == hwnd &&
+          wm_params->workspaces->data[i]->num != wm_params->active_workspace) {
+        wm_params->active_workspace = wm_params->workspaces->data[i]->num;
+      }
+    }
+  }
+}
+
+void set_active_tracking(WmParams *wm_params) {
+  BOOL active_tracking;
+
+  if (!SystemParametersInfo(SPI_GETACTIVEWINDOWTRACKING, 0,
+                            (void *)&active_tracking, 0)) {
+    print_last_error();
+    return;
+  }
+
+  if (active_tracking == TRUE) {
+    wm_params->active_tracking = TRUE;
+    return;
+  }
+
+  active_tracking = TRUE;
+  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0,
+                            (void *)&active_tracking,
+                            SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
+    print_last_error();
+    return;
+  }
+
+  wm_params->active_tracking = FALSE;
+}
+
+void restore_active_tracking(WmParams *wm_params) {
+  if (wm_params->active_tracking == TRUE) {
+    return;
+  }
+
+  BOOL *active_tracking = FALSE;
+  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0,
+                            (void *)active_tracking,
+                            SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
+    print_last_error();
+    return;
+  }
+}
+
 void log_state(WmParams *wm_params) {
   printf("\n-------\n");
   printf("Active workspace: %zu\n\n", wm_params->active_workspace);

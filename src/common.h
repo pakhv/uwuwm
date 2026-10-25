@@ -22,4 +22,10 @@ BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);
 
 void window_moved_or_resized(HWND hwnd, WmParams *wm_params);
 
+void set_active_workspace(HWND hwnd, WmParams *wm_params);
+
+void set_active_tracking(WmParams *wm_params);
+
+void restore_active_tracking(WmParams *wm_params);
+
 void print_last_error();

@@ -83,6 +83,11 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     window_moved_or_resized(hwnd, g_wm_params);
   }
 
+  // TODO:
+  if (event == EVENT_OBJECT_FOCUS) {
+    set_active_workspace(hwnd, g_wm_params);
+  }
+
   calculate_and_position_active_workspace(g_wm_params);
 }
 

@@ -16,6 +16,8 @@ void init(WmParams *wm_params) {
   EnumDisplayMonitors(NULL, NULL, enum_monitors_proc,
                       (LPARAM)wm_params->workspaces);
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
+
+  set_active_tracking(wm_params);
 }
 
 void main(void) {
@@ -30,6 +32,7 @@ void main(void) {
 
   start_event_loop(&wm_params);
 
+  restore_active_tracking(&wm_params);
   cleanup(&wm_params);
 }
 
