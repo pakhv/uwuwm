@@ -11,12 +11,14 @@ void check_all_windows_user_sized(Workspace *active_workspace, HWND hwnd);
 BOOL map_to_window_coords(HWND hwnd, LPRECT t_rect);
 size_t get_window_auto_width(WindowsVector *windows, LPRECT m_rect);
 void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx);
+void restore_active_tracking(WmParams *wm_params);
+BOOL is_window_ignored(StrVector *ignored_windows, char *p_name);
 
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
 
   calculate_workspace_windows(active_workspace);
-  position_workspaces_windows(params);
+  position_workspaces_windows(params, FALSE);
 }
 
 void calculate_windows_init(WmParams *params) {
@@ -84,7 +86,7 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   return TRUE;
 }
 
-void position_workspaces_windows(WmParams *wm_params) {
+void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
   size_t w_num = get_windows_number(wm_params);
 
   HDWP hdwp = BeginDeferWindowPos(w_num);
@@ -105,7 +107,7 @@ void position_workspaces_windows(WmParams *wm_params) {
       continue;
     }
 
-    if (!position_windows(hdwp, workspace->windows, FALSE)) {
+    if (!position_windows(hdwp, workspace->windows, on_shutdown)) {
       printf("Failed to position invisible windows\n");
       return;
     }
@@ -130,9 +132,10 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
       continue;
     }
 
-    if (IsZoomed(window->handle)) {
-      ShowWindow(window->handle, SW_RESTORE);
-    }
+    // TODO: should I be restoring that?
+    // if (IsZoomed(window->handle)) {
+    //   ShowWindow(window->handle, SW_RESTORE);
+    // }
 
     if (!visible) {
       size_t w_width = w_rect.right - w_rect.left;
@@ -152,6 +155,11 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
   }
 
   return TRUE;
+}
+
+void restore_windows(WmParams *wm_params) {
+  position_workspaces_windows(wm_params, TRUE);
+  restore_active_tracking(wm_params);
 }
 
 BOOL map_to_window_coords(HWND hwnd, LPRECT t_rect) {
@@ -235,6 +243,30 @@ Workspace *get_active_workspace(WmParams *wm_params) {
   return NULL;
 }
 
+Workspace *select_workspace(WmParams *wm_params, size_t num) {
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    if (wm_params->workspaces->data[i]->num == num) {
+      wm_params->active_workspace = num;
+      return wm_params->workspaces->data[i];
+    }
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  Workspace *new_workspace = malloc(sizeof(Workspace));
+  workspaces_vec_add(wm_params->workspaces, new_workspace);
+
+  new_workspace->num = num;
+  new_workspace->monitor = active_workspace->monitor;
+  new_workspace->windows = malloc(sizeof(WindowsVector));
+
+  wm_params->active_workspace = num;
+
+  calculate_and_position_active_workspace(wm_params);
+
+  return new_workspace;
+}
+
 BOOL is_window_manageable(HWND hwnd) {
   if (!IsWindow(hwnd)) {
     return FALSE;
@@ -261,7 +293,7 @@ BOOL is_window_manageable(HWND hwnd) {
   return TRUE;
 }
 
-BOOL add_window(HWND hwnd, WindowsVector *windows) {
+BOOL add_window(HWND hwnd, WindowsVector *windows, StrVector *ignored_windows) {
   if (!is_window_manageable(hwnd)) {
     return FALSE;
   }
@@ -270,6 +302,12 @@ BOOL add_window(HWND hwnd, WindowsVector *windows) {
 
   char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
   get_process_name_by_window(hwnd, p_name);
+
+  if (is_window_ignored(ignored_windows, p_name)) {
+    free(window);
+    free(p_name);
+    return TRUE;
+  }
 
   window->process_name = p_name;
   window->handle = hwnd;
@@ -541,6 +579,16 @@ void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx) {
   }
 
   windows->data[s_idx] = window;
+}
+
+BOOL is_window_ignored(StrVector *ignored_windows, char *p_name) {
+  for (size_t i = 0; i < ignored_windows->size; i++) {
+    if (strcmp(ignored_windows->data[i], p_name) == 0) {
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }
 
 void print_last_error() {

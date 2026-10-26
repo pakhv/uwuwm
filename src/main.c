@@ -10,6 +10,12 @@ BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
 
 void init(WmParams *wm_params) {
   wm_params->active_workspace = 1;
+
+  wm_params->ignored_windows = malloc(sizeof(StrVector));
+  INIT_VECTOR(wm_params->ignored_windows)
+  // TODO:
+  str_vec_add(wm_params->ignored_windows, "Code.exe");
+
   wm_params->workspaces = malloc(sizeof(WorkspacesVector));
   INIT_VECTOR(wm_params->workspaces)
 
@@ -28,11 +34,14 @@ void main(void) {
   printf("Workspaces num: %zu\n", wm_params.workspaces->size);
 
   calculate_windows_init(&wm_params);
-  position_workspaces_windows(&wm_params);
+  position_workspaces_windows(&wm_params, FALSE);
+
+  // TODO:
+  select_workspace(&wm_params, 2);
 
   start_event_loop(&wm_params);
 
-  restore_active_tracking(&wm_params);
+  restore_windows(&wm_params);
   cleanup(&wm_params);
 }
 
@@ -45,7 +54,7 @@ BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
     return FALSE;
   }
 
-  add_window(hwnd, active_workspace->windows);
+  add_window(hwnd, active_workspace->windows, wm_params->ignored_windows);
 
   return TRUE;
 }

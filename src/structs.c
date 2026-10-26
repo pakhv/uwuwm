@@ -20,6 +20,19 @@ void windows_vec_add(WindowsVector *arr, Window *el) {
   arr->size += 1;
 }
 
+void str_vec_add(StrVector *arr, char *el) {
+  if (arr->capacity <= arr->size) {
+    arr->capacity = 2 * (arr->size + 1);
+    arr->data = realloc(arr->data, arr->capacity * sizeof(char *));
+  }
+
+  char *new_el = malloc(MAX_EXE_NAME_LENGTH);
+  strcpy(new_el, el);
+
+  arr->data[arr->size] = new_el;
+  arr->size += 1;
+}
+
 void windows_vec_remove(WindowsVector *vec, size_t idx) {
   if (idx >= vec->size) {
     return;
@@ -36,6 +49,7 @@ void windows_vec_remove(WindowsVector *vec, size_t idx) {
 
 void cleanup(WmParams *wm_params) {
   WorkspacesVector *workspaces = wm_params->workspaces;
+  StrVector *ignored_windows = wm_params->ignored_windows;
   WindowsVector *windows = NULL;
 
   for (size_t i = 0; i < workspaces->size; i++) {
@@ -52,10 +66,18 @@ void cleanup(WmParams *wm_params) {
     free(workspaces->data[i]);
   }
 
+  for (size_t i = 0; i < ignored_windows->size; i++) {
+    free(ignored_windows->data[i]);
+  }
+
+  free(ignored_windows->data);
+  ignored_windows->size = 0;
+  ignored_windows->capacity = 0;
+  free(ignored_windows);
+
   free(workspaces->data);
   workspaces->size = 0;
   workspaces->capacity = 0;
-
   free(workspaces);
 }
 

@@ -41,14 +41,22 @@ typedef struct {
 } WorkspacesVector;
 
 typedef struct {
+  char **data;
+  size_t size;
+  size_t capacity;
+} StrVector;
+
+typedef struct {
   size_t active_workspace;
   WorkspacesVector *workspaces;
   BOOL active_tracking;
+  StrVector *ignored_windows;
 } WmParams;
 
 void workspaces_vec_add(WorkspacesVector *vec, Workspace *el);
 void windows_vec_add(WindowsVector *vec, Window *el);
 void windows_vec_remove(WindowsVector *vec, size_t idx);
+void str_vec_add(StrVector *arr, char *el);
 void cleanup_window(Window *window);
 void cleanup(WmParams *wm_params);
 

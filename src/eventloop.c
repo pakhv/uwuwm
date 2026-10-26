@@ -61,7 +61,8 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     }
 
     Workspace *active_workspace = get_active_workspace(g_wm_params);
-    if (!add_window(hwnd, active_workspace->windows)) {
+    if (!add_window(hwnd, active_workspace->windows,
+                    g_wm_params->ignored_windows)) {
       return;
     }
   }
