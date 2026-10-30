@@ -247,6 +247,8 @@ Workspace *select_workspace(WmParams *wm_params, size_t num) {
   for (size_t i = 0; i < wm_params->workspaces->size; i++) {
     if (wm_params->workspaces->data[i]->num == num) {
       wm_params->active_workspace = num;
+      calculate_and_position_active_workspace(wm_params);
+
       return wm_params->workspaces->data[i];
     }
   }
@@ -259,6 +261,7 @@ Workspace *select_workspace(WmParams *wm_params, size_t num) {
   new_workspace->num = num;
   new_workspace->monitor = active_workspace->monitor;
   new_workspace->windows = malloc(sizeof(WindowsVector));
+  INIT_VECTOR(new_workspace->windows);
 
   wm_params->active_workspace = num;
 

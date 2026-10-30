@@ -36,9 +36,6 @@ void main(void) {
   calculate_windows_init(&wm_params);
   position_workspaces_windows(&wm_params, FALSE);
 
-  // TODO:
-  select_workspace(&wm_params, 2);
-
   start_event_loop(&wm_params);
 
   restore_windows(&wm_params);

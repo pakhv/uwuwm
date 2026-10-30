@@ -8,6 +8,16 @@
 #define MAX_EXE_PATH_LENGTH 300
 #define MAX_EXE_NAME_LENGTH 100
 
+#define MOD_ALT_1 1
+#define MOD_ALT_2 2
+#define MOD_ALT_3 3
+#define MOD_ALT_4 4
+#define MOD_ALT_5 5
+#define MOD_ALT_6 6
+#define MOD_ALT_7 7
+#define MOD_ALT_8 8
+#define MOD_ALT_9 9
+
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
     p->size = 0;                                                               \
