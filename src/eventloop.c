@@ -52,16 +52,20 @@ void start_event_loop(WmParams *wm_params) {
 }
 
 void register_keys() {
-  for (size_t i = MOD_ALT_1; i <= MOD_ALT_9; i++) {
+  for (size_t i = MOD_ALT_1, j = MOD_ALT_SHIFT_1; i <= MOD_ALT_9; i++, j++) {
     if (!RegisterHotKey(NULL, i, MOD_ALT | 0x4000, 0x30 + i)) {
       printf("Failed to register Alt+%zu", i);
+    }
+    if (!RegisterHotKey(NULL, j, MOD_ALT | MOD_SHIFT | 0x4000, 0x30 + i)) {
+      printf("Failed to register Alt+Shift+%zu", i);
     }
   }
 }
 
 void unregister_keys() {
-  for (size_t i = MOD_ALT_1; i <= MOD_ALT_9; i++) {
+  for (size_t i = MOD_ALT_1, j = MOD_ALT_SHIFT_1; i <= MOD_ALT_9; i++, j++) {
     UnregisterHotKey(NULL, i);
+    UnregisterHotKey(NULL, j);
   }
 }
 
@@ -132,6 +136,17 @@ void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
   case MOD_ALT_8:
   case MOD_ALT_9:
     select_workspace(wm_params, w_param);
+    break;
+  case MOD_ALT_SHIFT_1:
+  case MOD_ALT_SHIFT_2:
+  case MOD_ALT_SHIFT_3:
+  case MOD_ALT_SHIFT_4:
+  case MOD_ALT_SHIFT_5:
+  case MOD_ALT_SHIFT_6:
+  case MOD_ALT_SHIFT_7:
+  case MOD_ALT_SHIFT_8:
+  case MOD_ALT_SHIFT_9:
+    move_active_window_to_workspace(wm_params, w_param - 10);
     break;
   default:
     break;

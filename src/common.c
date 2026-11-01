@@ -14,6 +14,11 @@ void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx);
 void restore_active_tracking(WmParams *wm_params);
 BOOL is_window_ignored(StrVector *ignored_windows, char *p_name);
 
+BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx);
+Workspace *get_workspace(WmParams *wm_params, size_t num);
+Workspace *get_or_create_workspace(WmParams *wm_params, size_t num,
+                                   HMONITOR hmonitor);
+
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
 
@@ -157,6 +162,33 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
   return TRUE;
 }
 
+void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
+  HWND hwnd = GetForegroundWindow();
+  if (hwnd == NULL) {
+    printf("Couldn't move a window to workspace %zu. No windows are active at "
+           "the moment\n",
+           num);
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    printf("Couldn't move a window to workspace %zu. No windows are active at "
+           "the moment. The window doesn't belong to the active workspace\n",
+           num);
+    return;
+  }
+
+  Workspace *new_window_workspace =
+      get_or_create_workspace(wm_params, num, active_workspace->monitor);
+
+  remove_window(hwnd, wm_params->workspaces);
+  add_window(hwnd, new_window_workspace->windows, wm_params->ignored_windows);
+
+  calculate_and_position_active_workspace(wm_params);
+}
+
 void restore_windows(WmParams *wm_params) {
   position_workspaces_windows(wm_params, TRUE);
   restore_active_tracking(wm_params);
@@ -244,28 +276,39 @@ Workspace *get_active_workspace(WmParams *wm_params) {
 }
 
 Workspace *select_workspace(WmParams *wm_params, size_t num) {
-  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
-    if (wm_params->workspaces->data[i]->num == num) {
-      wm_params->active_workspace = num;
-      calculate_and_position_active_workspace(wm_params);
+  Workspace *workspace = get_workspace(wm_params, num);
+  if (workspace != NULL) {
+    wm_params->active_workspace = num;
+    calculate_and_position_active_workspace(wm_params);
 
-      return wm_params->workspaces->data[i];
-    }
+    return workspace;
   }
 
   Workspace *active_workspace = get_active_workspace(wm_params);
+
+  Workspace *new_workspace =
+      get_or_create_workspace(wm_params, num, active_workspace->monitor);
+  wm_params->active_workspace = num;
+
+  calculate_and_position_active_workspace(wm_params);
+
+  return new_workspace;
+}
+
+Workspace *get_or_create_workspace(WmParams *wm_params, size_t num,
+                                   HMONITOR hmonitor) {
+  Workspace *workspace = get_workspace(wm_params, num);
+  if (workspace != NULL) {
+    return workspace;
+  }
 
   Workspace *new_workspace = malloc(sizeof(Workspace));
   workspaces_vec_add(wm_params->workspaces, new_workspace);
 
   new_workspace->num = num;
-  new_workspace->monitor = active_workspace->monitor;
+  new_workspace->monitor = hmonitor;
   new_workspace->windows = malloc(sizeof(WindowsVector));
   INIT_VECTOR(new_workspace->windows);
-
-  wm_params->active_workspace = num;
-
-  calculate_and_position_active_workspace(wm_params);
 
   return new_workspace;
 }
@@ -592,6 +635,27 @@ BOOL is_window_ignored(StrVector *ignored_windows, char *p_name) {
   }
 
   return FALSE;
+}
+
+BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx) {
+  for (size_t i = 0; i < workspace->windows->size; i++) {
+    if (workspace->windows->data[i]->handle == hwnd) {
+      *idx = i;
+      return TRUE;
+    }
+  }
+
+  return FALSE;
+}
+
+Workspace *get_workspace(WmParams *wm_params, size_t num) {
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    if (wm_params->workspaces->data[i]->num == num) {
+      return wm_params->workspaces->data[i];
+    }
+  }
+
+  return NULL;
 }
 
 void print_last_error() {

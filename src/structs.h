@@ -18,6 +18,16 @@
 #define MOD_ALT_8 8
 #define MOD_ALT_9 9
 
+#define MOD_ALT_SHIFT_1 11
+#define MOD_ALT_SHIFT_2 12
+#define MOD_ALT_SHIFT_3 13
+#define MOD_ALT_SHIFT_4 14
+#define MOD_ALT_SHIFT_5 15
+#define MOD_ALT_SHIFT_6 16
+#define MOD_ALT_SHIFT_7 17
+#define MOD_ALT_SHIFT_8 18
+#define MOD_ALT_SHIFT_9 19
+
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
     p->size = 0;                                                               \
