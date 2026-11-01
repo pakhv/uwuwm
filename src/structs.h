@@ -18,6 +18,7 @@
 #define MOD_ALT_8 8
 #define MOD_ALT_9 9
 
+#define MOD_ALT_SHIFT_DELTA 10
 #define MOD_ALT_SHIFT_1 11
 #define MOD_ALT_SHIFT_2 12
 #define MOD_ALT_SHIFT_3 13
@@ -70,6 +71,7 @@ typedef struct {
   size_t active_workspace;
   WorkspacesVector *workspaces;
   BOOL active_tracking;
+  BOOL active_zorder;
   StrVector *ignored_windows;
 } WmParams;
 

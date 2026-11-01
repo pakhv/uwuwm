@@ -175,13 +175,17 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
   size_t idx;
   if (!get_window_idx(active_workspace, hwnd, &idx)) {
     printf("Couldn't move a window to workspace %zu. No windows are active at "
-           "the moment. The window doesn't belong to the active workspace\n",
+           "the moment or the window doesn't belong to the active workspace\n",
            num);
     return;
   }
 
   Workspace *new_window_workspace =
       get_or_create_workspace(wm_params, num, active_workspace->monitor);
+
+  if (new_window_workspace->num == wm_params->active_workspace) {
+    return;
+  }
 
   remove_window(hwnd, wm_params->workspaces);
   add_window(hwnd, new_window_workspace->windows, wm_params->ignored_windows);
@@ -401,38 +405,41 @@ void set_active_workspace(HWND hwnd, WmParams *wm_params) {
 }
 
 void set_active_tracking(WmParams *wm_params) {
-  BOOL active_tracking;
-
   if (!SystemParametersInfo(SPI_GETACTIVEWINDOWTRACKING, 0,
-                            (void *)&active_tracking, 0)) {
+                            (void *)&wm_params->active_tracking, 0)) {
     print_last_error();
     return;
   }
 
-  if (active_tracking == TRUE) {
-    wm_params->active_tracking = TRUE;
-    return;
-  }
-
-  active_tracking = TRUE;
-  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0,
-                            (void *)&active_tracking,
+  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0, (void *)TRUE,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;
   }
 
-  wm_params->active_tracking = FALSE;
-}
-
-void restore_active_tracking(WmParams *wm_params) {
-  if (wm_params->active_tracking == TRUE) {
+  if (!SystemParametersInfo(SPI_GETACTIVEWNDTRKZORDER, 0,
+                            (void *)&wm_params->active_zorder, 0)) {
+    print_last_error();
     return;
   }
 
-  BOOL *active_tracking = FALSE;
+  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0, (void *)TRUE,
+                            SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
+    print_last_error();
+    return;
+  }
+}
+
+void restore_active_tracking(WmParams *wm_params) {
   if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0,
-                            (void *)active_tracking,
+                            (void *)(UINT_PTR)wm_params->active_tracking,
+                            SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
+    print_last_error();
+    return;
+  }
+
+  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0,
+                            (void *)(UINT_PTR)wm_params->active_zorder,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;

@@ -146,7 +146,7 @@ void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
   case MOD_ALT_SHIFT_7:
   case MOD_ALT_SHIFT_8:
   case MOD_ALT_SHIFT_9:
-    move_active_window_to_workspace(wm_params, w_param - 10);
+    move_active_window_to_workspace(wm_params, w_param - MOD_ALT_SHIFT_DELTA);
     break;
   default:
     break;
