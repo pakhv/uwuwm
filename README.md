@@ -1,7 +1,7 @@
 # uwuwm
 
 # TODO
-  - reset "hidden" windows positions on shut down
+  - preserve window RECT when moving it to a different workspace
   - hide inactive workspaces programs icons
   - keyboard controls
     - (+) select workspace

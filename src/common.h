@@ -1,5 +1,8 @@
 #include "structs.h"
 
+Workspace *get_or_create_workspace(WmParams *wm_params, size_t num,
+                                   HMONITOR hmonitor);
+
 void calculate_and_position_active_workspace(WmParams *params);
 
 void calculate_windows_init(WmParams *wm_params);

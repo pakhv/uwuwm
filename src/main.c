@@ -19,8 +19,7 @@ void init(WmParams *wm_params) {
   wm_params->workspaces = malloc(sizeof(WorkspacesVector));
   INIT_VECTOR(wm_params->workspaces)
 
-  EnumDisplayMonitors(NULL, NULL, enum_monitors_proc,
-                      (LPARAM)wm_params->workspaces);
+  EnumDisplayMonitors(NULL, NULL, enum_monitors_proc, (LPARAM)wm_params);
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 
   set_active_tracking(wm_params);
@@ -56,20 +55,10 @@ BOOL CALLBACK enum_windows_proc(HWND hwnd, LPARAM l_param) {
   return TRUE;
 }
 
-BOOL CALLBACK enum_monitors_proc(HMONITOR h_monitor, HDC h_dev, LPRECT rect,
+BOOL CALLBACK enum_monitors_proc(HMONITOR hmonitor, HDC h_dev, LPRECT rect,
                                  LPARAM l_param) {
-  WorkspacesVector *workspaces = (WorkspacesVector *)l_param;
-
-  Workspace *workspace = malloc(sizeof(Workspace));
-  workspaces_vec_add(workspaces, workspace);
-
-  workspace->monitor = h_monitor;
-  workspace->num = workspaces->size;
-
-  WindowsVector *windows = malloc(sizeof(WindowsVector));
-  INIT_VECTOR(windows);
-
-  workspace->windows = windows;
+  WmParams *wm_params = (WmParams *)l_param;
+  get_or_create_workspace(wm_params, wm_params->workspaces->size + 1, hmonitor);
 
   return TRUE;
 }

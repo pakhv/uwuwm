@@ -16,8 +16,6 @@ BOOL is_window_ignored(StrVector *ignored_windows, char *p_name);
 
 BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx);
 Workspace *get_workspace(WmParams *wm_params, size_t num);
-Workspace *get_or_create_workspace(WmParams *wm_params, size_t num,
-                                   HMONITOR hmonitor);
 
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);

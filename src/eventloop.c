@@ -117,6 +117,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   calculate_and_position_active_workspace(g_wm_params);
+  log_state(g_wm_params);
 
 Release:
   LeaveCriticalSection(&g_lock);
