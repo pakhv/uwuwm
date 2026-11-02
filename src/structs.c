@@ -38,8 +38,6 @@ void windows_vec_remove(WindowsVector *vec, size_t idx) {
     return;
   }
 
-  cleanup_window(vec->data[idx]);
-
   for (size_t i = idx; i < vec->size - 1; i++) {
     vec->data[i] = vec->data[i + 1];
   }

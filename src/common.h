@@ -21,7 +21,10 @@ Workspace *select_workspace(WmParams *wm_params, size_t num);
 
 BOOL add_window(HWND hwnd, WindowsVector *windows, StrVector *ignored_windows);
 
-BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces);
+BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces,
+                   Window **removed_window);
+
+BOOL remove_window_with_cleanup(HWND hwnd, WorkspacesVector *workspaces);
 
 void log_state(WmParams *wm_params);
 

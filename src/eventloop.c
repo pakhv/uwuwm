@@ -96,7 +96,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
 
   // window closed
   if (event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED) {
-    if (!remove_window(hwnd, g_wm_params->workspaces)) {
+    if (!remove_window_with_cleanup(hwnd, g_wm_params->workspaces)) {
       goto Release;
     }
   }
@@ -117,6 +117,7 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   calculate_and_position_active_workspace(g_wm_params);
+
   log_state(g_wm_params);
 
 Release:

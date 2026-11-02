@@ -185,8 +185,9 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
     return;
   }
 
-  remove_window(hwnd, wm_params->workspaces);
-  add_window(hwnd, new_window_workspace->windows, wm_params->ignored_windows);
+  Window *window_to_move = NULL;
+  remove_window(hwnd, wm_params->workspaces, &window_to_move);
+  windows_vec_add(new_window_workspace->windows, window_to_move);
 
   calculate_and_position_active_workspace(wm_params);
 }
@@ -372,7 +373,8 @@ BOOL add_window(HWND hwnd, WindowsVector *windows, StrVector *ignored_windows) {
   return TRUE;
 }
 
-BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
+BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces,
+                   Window **removed_window) {
   for (size_t i = 0; i < workspaces->size; i++) {
     WindowsVector *windows = workspaces->data[i]->windows;
 
@@ -381,11 +383,23 @@ BOOL remove_window(HWND hwnd, WorkspacesVector *workspaces) {
         printf("Removing window \"%s\" from namespace %zu\n",
                windows->data[j]->process_name, workspaces->data[i]->num);
 
+        *removed_window = windows->data[j];
         windows_vec_remove(windows, j);
 
         return TRUE;
       }
     }
+  }
+
+  return FALSE;
+}
+
+BOOL remove_window_with_cleanup(HWND hwnd, WorkspacesVector *workspaces) {
+  Window *window_to_remove = NULL;
+  if (remove_window(hwnd, workspaces, &window_to_remove)) {
+    cleanup_window(window_to_remove);
+
+    return TRUE;
   }
 
   return FALSE;
