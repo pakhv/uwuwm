@@ -192,6 +192,25 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
   calculate_and_position_active_workspace(wm_params);
 }
 
+void close_window(WmParams *wm_params) {
+  HWND hwnd = GetForegroundWindow();
+  if (hwnd == NULL) {
+    printf("Couldn't close a window. No windows are active at the moment\n");
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    printf("Couldn't close window %p. The window doesn't belong to the active "
+           "workspace\n",
+           hwnd);
+    return;
+  }
+
+  PostMessage(hwnd, WM_CLOSE, 0, 0);
+}
+
 void restore_windows(WmParams *wm_params) {
   position_workspaces_windows(wm_params, TRUE);
   restore_active_tracking(wm_params);

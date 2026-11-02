@@ -8,6 +8,7 @@
 #define MAX_EXE_PATH_LENGTH 300
 #define MAX_EXE_NAME_LENGTH 100
 
+#define KEY_0 0x30
 #define MOD_ALT_1 1
 #define MOD_ALT_2 2
 #define MOD_ALT_3 3
@@ -28,6 +29,9 @@
 #define MOD_ALT_SHIFT_7 17
 #define MOD_ALT_SHIFT_8 18
 #define MOD_ALT_SHIFT_9 19
+
+#define KEY_Q 0x51
+#define MOD_ALT_SHIFT_Q 20
 
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
