@@ -16,6 +16,7 @@ BOOL is_window_ignored(StrVector *ignored_windows, char *p_name);
 
 BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx);
 Workspace *get_workspace(WmParams *wm_params, size_t num);
+BOOL active_window_belongs_to_active_workspace(WmParams *wm_params, HWND *hwnd);
 
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
@@ -161,22 +162,12 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
 }
 
 void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
-  HWND hwnd = GetForegroundWindow();
-  if (hwnd == NULL) {
-    printf("Couldn't move a window to workspace %zu. No windows are active at "
-           "the moment\n",
-           num);
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
   }
 
   Workspace *active_workspace = get_active_workspace(wm_params);
-
-  size_t idx;
-  if (!get_window_idx(active_workspace, hwnd, &idx)) {
-    printf("Couldn't move a window to workspace %zu. No windows are active at "
-           "the moment or the window doesn't belong to the active workspace\n",
-           num);
-    return;
-  }
 
   Workspace *new_window_workspace =
       get_or_create_workspace(wm_params, num, active_workspace->monitor);
@@ -193,22 +184,37 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
 }
 
 void close_window(WmParams *wm_params) {
-  HWND hwnd = GetForegroundWindow();
-  if (hwnd == NULL) {
-    printf("Couldn't close a window. No windows are active at the moment\n");
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
+  }
+
+  PostMessage(hwnd, WM_CLOSE, 0, 0);
+}
+
+void swap_windows(WmParams *wm_params, DWORD direction) {
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
   }
 
   Workspace *active_workspace = get_active_workspace(wm_params);
 
   size_t idx;
-  if (!get_window_idx(active_workspace, hwnd, &idx)) {
-    printf("Couldn't close window %p. The window doesn't belong to the active "
-           "workspace\n",
-           hwnd);
+  get_window_idx(active_workspace, hwnd, &idx);
+
+  int target_idx = direction == MOD_ALT_SHIFT_LEFT ? idx - 1 : idx + 1;
+
+  if (target_idx < 0 || target_idx >= active_workspace->windows->size) {
     return;
   }
 
-  PostMessage(hwnd, WM_CLOSE, 0, 0);
+  Window *tmp_window = active_workspace->windows->data[idx];
+  active_workspace->windows->data[idx] =
+      active_workspace->windows->data[target_idx];
+  active_workspace->windows->data[target_idx] = tmp_window;
+
+  calculate_and_position_active_workspace(wm_params);
 }
 
 void restore_windows(WmParams *wm_params) {
@@ -694,6 +700,27 @@ Workspace *get_workspace(WmParams *wm_params, size_t num) {
   }
 
   return NULL;
+}
+
+BOOL active_window_belongs_to_active_workspace(WmParams *wm_params,
+                                               HWND *hwnd) {
+  *hwnd = GetForegroundWindow();
+  if (hwnd == NULL) {
+    printf("No windows are active at the moment\n");
+    return FALSE;
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (!get_window_idx(active_workspace, *hwnd, &idx)) {
+    printf("Active window doesn't belong to the active "
+           "workspace\n",
+           *hwnd);
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 void print_last_error() {

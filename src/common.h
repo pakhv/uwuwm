@@ -13,6 +13,8 @@ void calculate_workspace_windows(Workspace *workspace);
 
 void move_active_window_to_workspace(WmParams *wm_params, size_t num);
 
+void swap_windows(WmParams *wm_params, DWORD direction);
+
 size_t get_windows_number(WmParams *wm_params);
 
 Workspace *get_active_workspace(WmParams *wm_params);

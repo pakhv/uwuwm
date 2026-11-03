@@ -32,6 +32,8 @@
 
 #define KEY_Q 0x51
 #define MOD_ALT_SHIFT_Q 20
+#define MOD_ALT_SHIFT_LEFT 21
+#define MOD_ALT_SHIFT_RIGHT 22
 
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
