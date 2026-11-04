@@ -7,7 +7,7 @@ void calculate_and_position_active_workspace(WmParams *params);
 
 void calculate_windows_init(WmParams *wm_params);
 
-void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown);
+void position_workspaces_windows(WmParams *wm_params, DWORD options);
 
 void calculate_workspace_windows(Workspace *workspace);
 

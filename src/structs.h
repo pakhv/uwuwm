@@ -40,6 +40,9 @@
 #define WINDOW_HIGHLIGHT_ON 0x00FF863A
 #define WINDOW_HIGHLIGHT_OFF 0x00CCCCCC
 
+#define WP_VISIBLE 0x000001
+#define WP_SHUTDOWN 0x000010
+
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
     p->size = 0;                                                               \

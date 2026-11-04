@@ -4,7 +4,7 @@
 
 BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect);
 BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
-                      BOOL visible);
+                      DWORD options);
 BOOL is_window_manageable(HWND hwnd);
 BOOL window_width_changed(HWND hwnd, RECT w_rect, WmParams *wm_params);
 void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params);
@@ -25,7 +25,7 @@ void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
 
   calculate_workspace_windows(active_workspace);
-  position_workspaces_windows(params, FALSE);
+  position_workspaces_windows(params, 0);
 }
 
 void calculate_windows_init(WmParams *params) {
@@ -93,7 +93,8 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   return TRUE;
 }
 
-void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
+void position_workspaces_windows(WmParams *wm_params, DWORD options) {
+  options = options & ~WP_VISIBLE;
   size_t w_num = get_windows_number(wm_params);
 
   HDWP hdwp = BeginDeferWindowPos(w_num);
@@ -107,7 +108,7 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
 
     if (workspace->num == wm_params->active_workspace) {
       if (!position_windows(hdwp, wm_params->taskbar, workspace->windows,
-                            TRUE)) {
+                            options | WP_VISIBLE)) {
         printf("Failed to position visible windows\n");
         return;
       }
@@ -116,7 +117,7 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
     }
 
     if (!position_windows(hdwp, wm_params->taskbar, workspace->windows,
-                          on_shutdown)) {
+                          options)) {
       printf("Failed to position invisible windows\n");
       return;
     }
@@ -130,29 +131,28 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
 }
 
 BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
-                      BOOL visible) {
+                      DWORD options) {
   if (windows->size == 0) {
     return TRUE;
   }
 
+  BOOL visible = options & WP_VISIBLE;
+  BOOL shutdown = options & WP_SHUTDOWN;
+
   HWND f_hwnd = GetForegroundWindow();
-  if (f_hwnd == NULL) {
-    printf("No windows are active at the moment\n");
-    return FALSE;
-  }
 
   for (size_t i = 0; i < windows->size; i++) {
     Window *window = windows->data[i];
     RECT w_rect = window->w_rect;
 
-    highlight_window(window->handle, window->handle == f_hwnd);
+    highlight_window(window->handle, !shutdown && window->handle == f_hwnd);
 
     if (!map_to_window_coords(window->handle, &w_rect)) {
       printf("Failed to get window gaps %s\n", windows->data[i]->process_name);
       continue;
     }
 
-    if (!visible) {
+    if (!visible && !shutdown) {
       size_t w_width = w_rect.right - w_rect.left;
       w_rect.left = HIDDEN_WINDOW_X;
       w_rect.right = HIDDEN_WINDOW_X + w_width;
@@ -277,7 +277,7 @@ void highlight_window(HWND hwnd, BOOL is_active) {
 }
 
 void restore_windows(WmParams *wm_params) {
-  position_workspaces_windows(wm_params, TRUE);
+  position_workspaces_windows(wm_params, WP_SHUTDOWN);
   restore_active_tracking(wm_params);
 }
 

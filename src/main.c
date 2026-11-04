@@ -42,7 +42,7 @@ void main(void) {
   }
 
   calculate_windows_init(&wm_params);
-  position_workspaces_windows(&wm_params, FALSE);
+  position_workspaces_windows(&wm_params, 0);
 
   start_event_loop(&wm_params);
 
