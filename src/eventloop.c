@@ -148,6 +148,8 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   // focused window changed
+  // TODO: if there is noticeable perf issues when highlighting
+  // then add dedicated method
   if (event == EVENT_SYSTEM_FOREGROUND) {
   }
 
