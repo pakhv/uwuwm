@@ -124,6 +124,8 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
   if (!EndDeferWindowPos(hdwp)) {
     printf("Failed to position windows\n");
   }
+
+  log_state(wm_params);
 }
 
 BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
@@ -152,15 +154,15 @@ BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
                        w_rect.right - w_rect.left, w_rect.bottom - w_rect.top,
                        SWP_NOZORDER | SWP_NOACTIVATE);
 
+    if (def_hdpw == NULL) {
+      print_last_error();
+      return FALSE;
+    }
+
     if (visible) {
       taskbar->lpVtbl->AddTab(taskbar, window->handle);
     } else {
       taskbar->lpVtbl->DeleteTab(taskbar, window->handle);
-    }
-
-    if (def_hdpw == NULL) {
-      print_last_error();
-      return FALSE;
     }
   }
 

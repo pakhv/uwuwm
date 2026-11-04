@@ -41,8 +41,6 @@ void main(void) {
     return;
   }
 
-  log_state(&wm_params);
-
   calculate_windows_init(&wm_params);
   position_workspaces_windows(&wm_params, FALSE);
 
