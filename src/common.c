@@ -1,8 +1,10 @@
 #include "common.h"
 #include <dwmapi.h>
+#include <stdio.h>
 
 BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect);
-BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible);
+BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
+                      BOOL visible);
 BOOL is_window_manageable(HWND hwnd);
 BOOL window_width_changed(HWND hwnd, RECT w_rect, WmParams *wm_params);
 void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params);
@@ -103,7 +105,8 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
     Workspace *workspace = wm_params->workspaces->data[i];
 
     if (workspace->num == wm_params->active_workspace) {
-      if (!position_windows(hdwp, workspace->windows, TRUE)) {
+      if (!position_windows(hdwp, wm_params->taskbar, workspace->windows,
+                            TRUE)) {
         printf("Failed to position visible windows\n");
         return;
       }
@@ -111,7 +114,8 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
       continue;
     }
 
-    if (!position_windows(hdwp, workspace->windows, on_shutdown)) {
+    if (!position_windows(hdwp, wm_params->taskbar, workspace->windows,
+                          on_shutdown)) {
       printf("Failed to position invisible windows\n");
       return;
     }
@@ -122,7 +126,8 @@ void position_workspaces_windows(WmParams *wm_params, BOOL on_shutdown) {
   }
 }
 
-BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
+BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
+                      BOOL visible) {
   if (windows->size == 0) {
     return TRUE;
   }
@@ -136,11 +141,6 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
       continue;
     }
 
-    // TODO: should I be restoring that?
-    // if (IsZoomed(window->handle)) {
-    //   ShowWindow(window->handle, SW_RESTORE);
-    // }
-
     if (!visible) {
       size_t w_width = w_rect.right - w_rect.left;
       w_rect.left = HIDDEN_WINDOW_X;
@@ -151,6 +151,12 @@ BOOL position_windows(HDWP hdwp, WindowsVector *windows, BOOL visible) {
         DeferWindowPos(hdwp, window->handle, NULL, w_rect.left, w_rect.top,
                        w_rect.right - w_rect.left, w_rect.bottom - w_rect.top,
                        SWP_NOZORDER | SWP_NOACTIVATE);
+
+    if (visible) {
+      taskbar->lpVtbl->AddTab(taskbar, window->handle);
+    } else {
+      taskbar->lpVtbl->DeleteTab(taskbar, window->handle);
+    }
 
     if (def_hdpw == NULL) {
       print_last_error();
@@ -332,6 +338,12 @@ Workspace *get_active_workspace(WmParams *wm_params) {
 }
 
 Workspace *select_workspace(WmParams *wm_params, size_t num) {
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  if (num == wm_params->active_workspace) {
+    return active_workspace;
+  }
+
   Workspace *workspace = get_workspace(wm_params, num);
   if (workspace != NULL) {
     wm_params->active_workspace = num;
@@ -339,8 +351,6 @@ Workspace *select_workspace(WmParams *wm_params, size_t num) {
 
     return workspace;
   }
-
-  Workspace *active_workspace = get_active_workspace(wm_params);
 
   Workspace *new_workspace =
       get_or_create_workspace(wm_params, num, active_workspace->monitor);

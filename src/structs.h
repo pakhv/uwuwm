@@ -1,5 +1,5 @@
 #include <Windows.h>
-#include <stdio.h>
+#include <shobjidl.h>
 
 #ifndef STRUCTS_H
 #define STRUCTS_H
@@ -81,6 +81,7 @@ typedef struct {
   BOOL active_tracking;
   BOOL active_zorder;
   StrVector *ignored_windows;
+  ITaskbarList *taskbar;
 } WmParams;
 
 void workspaces_vec_add(WorkspacesVector *vec, Workspace *el);

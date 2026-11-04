@@ -55,6 +55,9 @@ void cleanup(WmParams *wm_params) {
 
     for (size_t j = 0; j < windows->size; j++) {
       if (windows->data[j] != NULL) {
+        wm_params->taskbar->lpVtbl->AddTab(wm_params->taskbar,
+                                           windows->data[j]->handle);
+
         free(windows->data[j]->process_name);
         free(windows->data[j]);
       }
@@ -77,6 +80,11 @@ void cleanup(WmParams *wm_params) {
   workspaces->size = 0;
   workspaces->capacity = 0;
   free(workspaces);
+
+  if (wm_params->taskbar != NULL) {
+    wm_params->taskbar->lpVtbl->Release(wm_params->taskbar);
+    wm_params->taskbar = NULL;
+  }
 }
 
 void cleanup_window(Window *window) {

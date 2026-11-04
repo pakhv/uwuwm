@@ -6,3 +6,4 @@
   - multiple monitors setup
   - move window focus with window on swap
   - fix messages logging
+  - add borders for focused window
