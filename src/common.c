@@ -234,12 +234,16 @@ void move_focus(WmParams *wm_params, DWORD direction) {
     return;
   }
 
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
   HWND hwnd = NULL;
   if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    if (active_workspace->windows->size > 0) {
+      SetForegroundWindow(active_workspace->windows->data[0]->handle);
+    }
+
     return;
   }
-
-  Workspace *active_workspace = get_active_workspace(wm_params);
 
   size_t idx;
   get_window_idx(active_workspace, hwnd, &idx);
