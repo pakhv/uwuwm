@@ -34,6 +34,8 @@
 #define MOD_ALT_SHIFT_Q 20
 #define MOD_ALT_SHIFT_LEFT 21
 #define MOD_ALT_SHIFT_RIGHT 22
+#define MOD_ALT_LEFT 23
+#define MOD_ALT_RIGHT 24
 
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \

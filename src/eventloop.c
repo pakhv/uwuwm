@@ -75,6 +75,14 @@ void register_keys() {
                       VK_RIGHT)) {
     printf("Failed to register Alt+Shift+Right");
   }
+
+  if (!RegisterHotKey(NULL, MOD_ALT_LEFT, MOD_ALT | 0x4000, VK_LEFT)) {
+    printf("Failed to register Alt+Left");
+  }
+
+  if (!RegisterHotKey(NULL, MOD_ALT_RIGHT, MOD_ALT | 0x4000, VK_RIGHT)) {
+    printf("Failed to register Alt+Right");
+  }
 }
 
 void unregister_keys() {
@@ -84,8 +92,12 @@ void unregister_keys() {
   }
 
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_Q);
+
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_LEFT);
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_RIGHT);
+
+  UnregisterHotKey(NULL, MOD_ALT_LEFT);
+  UnregisterHotKey(NULL, MOD_ALT_RIGHT);
 }
 
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
@@ -175,6 +187,10 @@ void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
   case MOD_ALT_SHIFT_LEFT:
   case MOD_ALT_SHIFT_RIGHT:
     swap_windows(wm_params, w_param);
+    break;
+  case MOD_ALT_LEFT:
+  case MOD_ALT_RIGHT:
+    move_focus(wm_params, w_param);
     break;
   default:
     break;

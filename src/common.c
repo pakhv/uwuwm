@@ -193,6 +193,10 @@ void close_window(WmParams *wm_params) {
 }
 
 void swap_windows(WmParams *wm_params, DWORD direction) {
+  if (direction != MOD_ALT_SHIFT_LEFT && direction != MOD_ALT_SHIFT_RIGHT) {
+    return;
+  }
+
   HWND hwnd = NULL;
   if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
     return;
@@ -215,6 +219,30 @@ void swap_windows(WmParams *wm_params, DWORD direction) {
   active_workspace->windows->data[target_idx] = tmp_window;
 
   calculate_and_position_active_workspace(wm_params);
+}
+
+void move_focus(WmParams *wm_params, DWORD direction) {
+  if (direction != MOD_ALT_LEFT && direction != MOD_ALT_RIGHT) {
+    return;
+  }
+
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  get_window_idx(active_workspace, hwnd, &idx);
+
+  int target_idx = direction == MOD_ALT_LEFT ? idx - 1 : idx + 1;
+
+  if (target_idx < 0 || target_idx >= active_workspace->windows->size) {
+    return;
+  }
+
+  SetForegroundWindow(active_workspace->windows->data[target_idx]->handle);
 }
 
 void restore_windows(WmParams *wm_params) {
