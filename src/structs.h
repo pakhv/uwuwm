@@ -37,6 +37,9 @@
 #define MOD_ALT_LEFT 23
 #define MOD_ALT_RIGHT 24
 
+#define WINDOW_HIGHLIGHT_ON 0x00FF863A
+#define WINDOW_HIGHLIGHT_OFF 0x00CCCCCC
+
 #define INIT_VECTOR(p)                                                         \
   do {                                                                         \
     p->size = 0;                                                               \

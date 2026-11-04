@@ -19,6 +19,7 @@ BOOL is_window_ignored(StrVector *ignored_windows, char *p_name);
 BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx);
 Workspace *get_workspace(WmParams *wm_params, size_t num);
 BOOL active_window_belongs_to_active_workspace(WmParams *wm_params, HWND *hwnd);
+void highlight_window(HWND hwnd, BOOL is_active);
 
 void calculate_and_position_active_workspace(WmParams *params) {
   Workspace *active_workspace = get_active_workspace(params);
@@ -134,9 +135,17 @@ BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
     return TRUE;
   }
 
+  HWND f_hwnd = GetForegroundWindow();
+  if (f_hwnd == NULL) {
+    printf("No windows are active at the moment\n");
+    return FALSE;
+  }
+
   for (size_t i = 0; i < windows->size; i++) {
     Window *window = windows->data[i];
     RECT w_rect = window->w_rect;
+
+    highlight_window(window->handle, window->handle == f_hwnd);
 
     if (!map_to_window_coords(window->handle, &w_rect)) {
       printf("Failed to get window gaps %s\n", windows->data[i]->process_name);
@@ -255,6 +264,16 @@ void move_focus(WmParams *wm_params, DWORD direction) {
   }
 
   SetForegroundWindow(active_workspace->windows->data[target_idx]->handle);
+}
+
+void highlight_window(HWND hwnd, BOOL is_active) {
+  COLORREF color = is_active ? WINDOW_HIGHLIGHT_ON : WINDOW_HIGHLIGHT_OFF;
+  HRESULT hr =
+      DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &color, sizeof(color));
+
+  if (FAILED(hr)) {
+    printf("Failed to highlight active workspace windows\n");
+  }
 }
 
 void restore_windows(WmParams *wm_params) {

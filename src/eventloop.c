@@ -31,7 +31,7 @@ void start_event_loop(WmParams *wm_params) {
 
   register_keys();
   HWINEVENTHOOK win_hook = SetWinEventHook(
-      EVENT_SYSTEM_MOVESIZEEND, EVENT_OBJECT_UNCLOAKED, NULL, handle_win_events,
+      EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_UNCLOAKED, NULL, handle_win_events,
       0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
   MSG msg = {0};
@@ -147,6 +147,10 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     set_active_workspace(hwnd, g_wm_params);
   }
 
+  // focused window changed
+  if (event == EVENT_SYSTEM_FOREGROUND) {
+  }
+
   calculate_and_position_active_workspace(g_wm_params);
 
 Release:
@@ -201,7 +205,8 @@ BOOL is_known_event(DWORD event) {
   return event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED ||
          event == EVENT_OBJECT_DESTROY || event == EVENT_OBJECT_CLOAKED ||
          event == EVENT_SYSTEM_MINIMIZESTART ||
-         event == EVENT_SYSTEM_MINIMIZEEND || event == EVENT_SYSTEM_MOVESIZEEND;
+         event == EVENT_SYSTEM_MINIMIZEEND ||
+         event == EVENT_SYSTEM_MOVESIZEEND || event == EVENT_SYSTEM_FOREGROUND;
 }
 
 void create_hidden_window(WNDCLASSEX *wc) {
