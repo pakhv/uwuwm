@@ -26,7 +26,7 @@ BOOL init(WmParams *wm_params) {
   EnumDisplayMonitors(NULL, NULL, enum_monitors_proc, (LPARAM)wm_params);
   EnumWindows(enum_windows_proc, (LPARAM)wm_params);
 
-  set_active_tracking(wm_params);
+  // set_active_tracking(wm_params);
 
   return TRUE;
 }

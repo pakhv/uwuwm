@@ -102,15 +102,15 @@ void unregister_keys() {
 
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
                        LONG c_id, DWORD t_id, DWORD time) {
-  EnterCriticalSection(&g_lock);
-
   if (o_id != OBJID_WINDOW || c_id != CHILDID_SELF) {
-    goto Release;
+    return;
   }
 
   if (!is_known_event(event)) {
-    goto Release;
+    return;
   }
+
+  EnterCriticalSection(&g_lock);
 
   // window opened
   if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
@@ -148,8 +148,8 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   // focused window changed
-  // TODO: if there is noticeable perf issues when highlighting
-  // then add dedicated method
+  // TODO: if there are noticeable perf issues when highlighting
+  // then add dedicated function
   if (event == EVENT_SYSTEM_FOREGROUND) {
   }
 

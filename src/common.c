@@ -278,7 +278,7 @@ void highlight_window(HWND hwnd, BOOL is_active) {
 
 void restore_windows(WmParams *wm_params) {
   position_workspaces_windows(wm_params, WP_SHUTDOWN);
-  restore_active_tracking(wm_params);
+  // restore_active_tracking(wm_params);
 }
 
 BOOL map_to_window_coords(HWND hwnd, LPRECT t_rect) {
@@ -511,7 +511,7 @@ void set_active_tracking(WmParams *wm_params) {
     return;
   }
 
-  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0, (void *)TRUE,
+  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0, (void *)FALSE,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;
@@ -523,7 +523,7 @@ void set_active_tracking(WmParams *wm_params) {
     return;
   }
 
-  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0, (void *)TRUE,
+  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0, (void *)FALSE,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;
