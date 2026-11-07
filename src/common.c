@@ -20,6 +20,8 @@ BOOL get_window_idx(Workspace *workspace, HWND hwnd, size_t *idx);
 Workspace *get_workspace(WmParams *wm_params, size_t num);
 BOOL active_window_belongs_to_active_workspace(WmParams *wm_params, HWND *hwnd);
 void highlight_window(HWND hwnd, BOOL is_active);
+void find_next_visible_window(WindowsVector *windows, size_t start_idx,
+                              BOOL forward_search, size_t *idx);
 
 void calculate_and_position_active_workspace(WmParams *wm_params) {
   Workspace *active_workspace = get_active_workspace(wm_params);
@@ -52,7 +54,8 @@ void calculate_workspace_windows(Workspace *workspace) {
   for (size_t i = 0; i < workspace->windows->size; i++) {
     Window *window = workspace->windows->data[i];
 
-    if (!IsIconic(window->handle)) {
+    window->minimized = IsIconic(window->handle);
+    if (!window->minimized) {
       windows_vec_add(v_windows, window);
     }
   }
@@ -234,11 +237,15 @@ void swap_windows(WmParams *wm_params, DWORD direction) {
   Workspace *active_workspace = get_active_workspace(wm_params);
 
   size_t idx;
-  get_window_idx(active_workspace, hwnd, &idx);
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    return;
+  }
 
-  int target_idx = direction == MOD_ALT_SHIFT_LEFT ? idx - 1 : idx + 1;
+  size_t target_idx;
+  find_next_visible_window(active_workspace->windows, idx,
+                           direction == MOD_ALT_SHIFT_RIGHT, &target_idx);
 
-  if (target_idx < 0 || target_idx >= active_workspace->windows->size) {
+  if (target_idx == idx) {
     return;
   }
 
@@ -267,11 +274,15 @@ void move_focus(WmParams *wm_params, DWORD direction) {
   }
 
   size_t idx;
-  get_window_idx(active_workspace, hwnd, &idx);
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    return;
+  }
 
-  int target_idx = direction == MOD_ALT_LEFT ? idx - 1 : idx + 1;
+  size_t target_idx;
+  find_next_visible_window(active_workspace->windows, idx,
+                           direction == MOD_ALT_RIGHT, &target_idx);
 
-  if (target_idx < 0 || target_idx >= active_workspace->windows->size) {
+  if (target_idx == idx) {
     return;
   }
 
@@ -788,6 +799,33 @@ BOOL active_window_belongs_to_active_workspace(WmParams *wm_params,
   }
 
   return TRUE;
+}
+
+void find_next_visible_window(WindowsVector *windows, size_t start_idx,
+                              BOOL forward_search, size_t *idx) {
+  *idx = start_idx;
+  if (forward_search && start_idx >= windows->size - 1 ||
+      !forward_search && start_idx == 0) {
+    return;
+  }
+
+  if (forward_search) {
+    for (size_t i = start_idx + 1; i < windows->size; i++) {
+      if (!windows->data[i]->minimized) {
+        *idx = i;
+        return;
+      }
+    }
+
+    return;
+  }
+
+  for (int i = start_idx - 1; i >= 0; i--) {
+    if (!windows->data[i]->minimized) {
+      *idx = i;
+      return;
+    }
+  }
 }
 
 void print_last_error() {

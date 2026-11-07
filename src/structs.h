@@ -57,6 +57,7 @@ typedef struct {
   char *process_name;
   RECT w_rect;
   BOOL user_sized;
+  BOOL minimized;
 } Window;
 
 typedef struct {
