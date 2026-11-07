@@ -196,6 +196,7 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
   Window *window_to_move = NULL;
   remove_window(hwnd, wm_params->workspaces, &window_to_move);
   windows_vec_add(new_window_workspace->windows, window_to_move);
+  calculate_workspace_windows(new_window_workspace);
 
   calculate_and_position_active_workspace(wm_params);
 }
@@ -369,21 +370,13 @@ Workspace *select_workspace(WmParams *wm_params, size_t num) {
     return active_workspace;
   }
 
-  Workspace *workspace = get_workspace(wm_params, num);
-  if (workspace != NULL) {
-    wm_params->active_workspace = num;
-    calculate_and_position_active_workspace(wm_params);
-
-    return workspace;
-  }
-
-  Workspace *new_workspace =
+  Workspace *workspace =
       get_or_create_workspace(wm_params, num, active_workspace->monitor);
-  wm_params->active_workspace = num;
 
+  wm_params->active_workspace = num;
   calculate_and_position_active_workspace(wm_params);
 
-  return new_workspace;
+  return workspace;
 }
 
 Workspace *get_or_create_workspace(WmParams *wm_params, size_t num,
@@ -511,7 +504,7 @@ void set_active_tracking(WmParams *wm_params) {
     return;
   }
 
-  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0, (void *)FALSE,
+  if (!SystemParametersInfo(SPI_SETACTIVEWINDOWTRACKING, 0, (void *)TRUE,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;
@@ -523,7 +516,7 @@ void set_active_tracking(WmParams *wm_params) {
     return;
   }
 
-  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0, (void *)FALSE,
+  if (!SystemParametersInfo(SPI_SETACTIVEWNDTRKZORDER, 0, (void *)TRUE,
                             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE)) {
     print_last_error();
     return;
