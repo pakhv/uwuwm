@@ -30,12 +30,14 @@
 #define MOD_ALT_SHIFT_8 18
 #define MOD_ALT_SHIFT_9 19
 
+#define KEY_P 0x50
 #define KEY_Q 0x51
 #define MOD_ALT_SHIFT_Q 20
 #define MOD_ALT_SHIFT_LEFT 21
 #define MOD_ALT_SHIFT_RIGHT 22
 #define MOD_ALT_LEFT 23
 #define MOD_ALT_RIGHT 24
+#define MOD_ALT_P 25
 
 #define WINDOW_HIGHLIGHT_ON 0x00FF863A
 #define WINDOW_HIGHLIGHT_OFF 0x00CCCCCC
@@ -88,6 +90,7 @@ typedef struct {
   BOOL active_zorder;
   StrVector *ignored_windows;
   ITaskbarList *taskbar;
+  BOOL pause_wm;
 } WmParams;
 
 void workspaces_vec_add(WorkspacesVector *vec, Workspace *el);

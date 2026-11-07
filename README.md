@@ -1,6 +1,7 @@
 # uwuwm
 
 # TODO
+  - consider minimized windows when swapping windows and moving focus
   - minimize/restore shortcut
   - pause/resume tiling
   - multiple monitors setup

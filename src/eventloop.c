@@ -66,6 +66,10 @@ void register_keys() {
     printf("Failed to register Alt+Shift+Q");
   }
 
+  if (!RegisterHotKey(NULL, MOD_ALT_P, MOD_ALT | 0x4000, KEY_P)) {
+    printf("Failed to register Alt+Shift+P");
+  }
+
   if (!RegisterHotKey(NULL, MOD_ALT_SHIFT_LEFT, MOD_ALT | MOD_SHIFT | 0x4000,
                       VK_LEFT)) {
     printf("Failed to register Alt+Shift+Left");
@@ -92,6 +96,7 @@ void unregister_keys() {
   }
 
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_Q);
+  UnregisterHotKey(NULL, MOD_ALT_P);
 
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_LEFT);
   UnregisterHotKey(NULL, MOD_ALT_SHIFT_RIGHT);
@@ -111,6 +116,10 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   EnterCriticalSection(&g_lock);
+
+  if (g_wm_params->pause_wm) {
+    return;
+  }
 
   // window opened
   if (event == EVENT_OBJECT_SHOW || event == EVENT_OBJECT_UNCLOAKED) {
@@ -162,6 +171,10 @@ Release:
 void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
   EnterCriticalSection(&g_lock);
 
+  if (wm_params->pause_wm && w_param != MOD_ALT_P) {
+    return;
+  }
+
   switch (w_param) {
   case MOD_ALT_1:
   case MOD_ALT_2:
@@ -187,6 +200,9 @@ void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
     break;
   case MOD_ALT_SHIFT_Q:
     close_window(wm_params);
+    break;
+  case MOD_ALT_P:
+    toggle_pause(wm_params);
     break;
   case MOD_ALT_SHIFT_LEFT:
   case MOD_ALT_SHIFT_RIGHT:

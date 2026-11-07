@@ -32,6 +32,8 @@ BOOL remove_window_with_cleanup(HWND hwnd, WorkspacesVector *workspaces);
 
 void close_window(WmParams *wm_params);
 
+void toggle_pause(WmParams *wm_params);
+
 void log_state(WmParams *wm_params);
 
 BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);

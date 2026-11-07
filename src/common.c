@@ -21,11 +21,11 @@ Workspace *get_workspace(WmParams *wm_params, size_t num);
 BOOL active_window_belongs_to_active_workspace(WmParams *wm_params, HWND *hwnd);
 void highlight_window(HWND hwnd, BOOL is_active);
 
-void calculate_and_position_active_workspace(WmParams *params) {
-  Workspace *active_workspace = get_active_workspace(params);
+void calculate_and_position_active_workspace(WmParams *wm_params) {
+  Workspace *active_workspace = get_active_workspace(wm_params);
 
   calculate_workspace_windows(active_workspace);
-  position_workspaces_windows(params, 0);
+  position_workspaces_windows(wm_params, 0);
 }
 
 void calculate_windows_init(WmParams *params) {
@@ -69,13 +69,9 @@ BOOL calculate_windows(WindowsVector *windows, LPRECT m_rect) {
   }
 
   size_t w_width = get_window_auto_width(windows, m_rect);
-  size_t w_height = m_rect->bottom - m_rect->top;
-
   size_t l_shift = m_rect->left;
 
   for (size_t i = 0; i < windows->size; i++) {
-    HWND window = windows->data[i]->handle;
-
     size_t width =
         windows->data[i]->user_sized
             ? windows->data[i]->w_rect.right - windows->data[i]->w_rect.left
@@ -196,7 +192,10 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
   Window *window_to_move = NULL;
   remove_window(hwnd, wm_params->workspaces, &window_to_move);
   windows_vec_add(new_window_workspace->windows, window_to_move);
-  calculate_workspace_windows(new_window_workspace);
+
+  // DwmGetWindowAttribute DWMWA_EXTENDED_FRAME_BOUNDS returns wrong rect
+  // for hidden Edge
+  // calculate_workspace_windows(new_window_workspace);
 
   calculate_and_position_active_workspace(wm_params);
 }
@@ -208,6 +207,18 @@ void close_window(WmParams *wm_params) {
   }
 
   PostMessage(hwnd, WM_CLOSE, 0, 0);
+}
+
+void toggle_pause(WmParams *wm_params) {
+  wm_params->pause_wm = !wm_params->pause_wm;
+
+  if (!wm_params->pause_wm) {
+    Workspace *active_workspace = get_active_workspace(wm_params);
+    calculate_workspace_windows(active_workspace);
+  }
+
+  position_workspaces_windows(wm_params,
+                              wm_params->pause_wm ? WM_SHOWWINDOW : 0);
 }
 
 void swap_windows(WmParams *wm_params, DWORD direction) {
