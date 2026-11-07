@@ -195,10 +195,7 @@ void move_active_window_to_workspace(WmParams *wm_params, size_t num) {
   Window *window_to_move = NULL;
   remove_window(hwnd, wm_params->workspaces, &window_to_move);
   windows_vec_add(new_window_workspace->windows, window_to_move);
-
-  // DwmGetWindowAttribute DWMWA_EXTENDED_FRAME_BOUNDS returns wrong rect
-  // for hidden Edge
-  // calculate_workspace_windows(new_window_workspace);
+  wm_params->active_workspace = num;
 
   calculate_and_position_active_workspace(wm_params);
 }
