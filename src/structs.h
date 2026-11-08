@@ -32,12 +32,24 @@
 
 #define KEY_P 0x50
 #define KEY_Q 0x51
+#define KEY_M 0x4D
+
+// close
 #define MOD_ALT_SHIFT_Q 20
+// swap left
 #define MOD_ALT_SHIFT_LEFT 21
+// swap right
 #define MOD_ALT_SHIFT_RIGHT 22
+// move focus left
 #define MOD_ALT_LEFT 23
+// move focus right
 #define MOD_ALT_RIGHT 24
+// pause wm
 #define MOD_ALT_SHIFT_P 25
+// minimize/restore
+#define MOD_ALT_M 26
+// maximize/restore
+#define MOD_ALT_SHIFT_M 27
 
 #define WINDOW_HIGHLIGHT_ON 0x00FF863A
 #define WINDOW_HIGHLIGHT_OFF 0x00CCCCCC

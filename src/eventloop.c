@@ -88,6 +88,15 @@ void register_keys() {
   if (!RegisterHotKey(NULL, MOD_ALT_RIGHT, MOD_ALT | 0x4000, VK_RIGHT)) {
     printf("Failed to register Alt+Right");
   }
+
+  if (!RegisterHotKey(NULL, MOD_ALT_M, MOD_ALT | 0x4000, KEY_M)) {
+    printf("Failed to register Alt+M");
+  }
+
+  if (!RegisterHotKey(NULL, MOD_ALT_SHIFT_M, MOD_ALT | MOD_SHIFT | 0x4000,
+                      KEY_M)) {
+    printf("Failed to register Alt+M");
+  }
 }
 
 void unregister_keys() {
@@ -104,6 +113,9 @@ void unregister_keys() {
 
   UnregisterHotKey(NULL, MOD_ALT_LEFT);
   UnregisterHotKey(NULL, MOD_ALT_RIGHT);
+
+  UnregisterHotKey(NULL, MOD_ALT_M);
+  UnregisterHotKey(NULL, MOD_ALT_SHIFT_M);
 }
 
 VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
@@ -142,11 +154,6 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
     }
   }
 
-  // window minimized/maximized
-  if (event == EVENT_SYSTEM_MINIMIZESTART ||
-      event == EVENT_SYSTEM_MINIMIZEEND) {
-  }
-
   // window resized/moved
   if (event == EVENT_SYSTEM_MOVESIZEEND) {
     window_moved_or_resized(hwnd, g_wm_params);
@@ -164,6 +171,13 @@ VOID handle_win_events(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG o_id,
   }
 
   calculate_and_position_active_workspace(g_wm_params);
+
+  // focusing a window after minimizing or closing a window
+  // if all active workspace windows are minimized
+  if (event == EVENT_SYSTEM_MINIMIZESTART || event == EVENT_OBJECT_DESTROY ||
+      event == EVENT_OBJECT_CLOAKED) {
+    focus_window_if_none_focused(g_wm_params, hwnd);
+  }
 
 Release:
   LeaveCriticalSection(&g_lock);
@@ -212,6 +226,9 @@ void handle_key_presses(WPARAM w_param, WmParams *wm_params) {
   case MOD_ALT_LEFT:
   case MOD_ALT_RIGHT:
     move_focus(wm_params, w_param);
+    break;
+  case MOD_ALT_M:
+    minimize_restore(wm_params);
     break;
   default:
     break;

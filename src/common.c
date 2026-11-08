@@ -141,6 +141,10 @@ BOOL position_windows(HDWP hdwp, ITaskbarList *taskbar, WindowsVector *windows,
   HWND f_hwnd = GetForegroundWindow();
 
   for (size_t i = 0; i < windows->size; i++) {
+    if (windows->data[i]->minimized) {
+      continue;
+    }
+
     Window *window = windows->data[i];
     RECT w_rect = window->w_rect;
 
@@ -219,6 +223,28 @@ void toggle_pause(WmParams *wm_params) {
 
   position_workspaces_windows(wm_params,
                               wm_params->pause_wm ? WM_SHOWWINDOW : 0);
+}
+
+void minimize_restore(WmParams *wm_params) {
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    return;
+  }
+
+  int command = active_workspace->windows->data[idx]->minimized ? SW_RESTORE
+                                                                : SW_MINIMIZE;
+  ShowWindow(hwnd, command);
+
+  calculate_and_position_active_workspace(wm_params);
+
+  focus_window_if_none_focused(wm_params, hwnd);
 }
 
 void swap_windows(WmParams *wm_params, DWORD direction) {
@@ -823,6 +849,31 @@ void find_next_visible_window(WindowsVector *windows, size_t start_idx,
       return;
     }
   }
+}
+
+void focus_window_if_none_focused(WmParams *wm_params, HWND last_focused_hwnd) {
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  if (active_workspace->windows->size == 0) {
+    return;
+  }
+
+  for (size_t i = 0; i < active_workspace->windows->size; i++) {
+    if (!active_workspace->windows->data[i]->minimized) {
+      return;
+    }
+  }
+
+  size_t next_window_idx;
+  if (!get_window_idx(active_workspace, last_focused_hwnd, &next_window_idx)) {
+    next_window_idx = 0;
+  } else {
+    next_window_idx = next_window_idx + 1 >= active_workspace->windows->size
+                          ? 0
+                          : next_window_idx + 1;
+  }
+
+  SetForegroundWindow(active_workspace->windows->data[next_window_idx]->handle);
 }
 
 void print_last_error() {

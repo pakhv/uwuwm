@@ -34,6 +34,8 @@ void close_window(WmParams *wm_params);
 
 void toggle_pause(WmParams *wm_params);
 
+void minimize_restore(WmParams *wm_params);
+
 void log_state(WmParams *wm_params);
 
 BOOL is_window_tracked(HWND hwnd, WmParams *wm_params);
@@ -45,5 +47,7 @@ void set_active_workspace(HWND hwnd, WmParams *wm_params);
 void set_active_tracking(WmParams *wm_params);
 
 void restore_windows(WmParams *wm_params);
+
+void focus_window_if_none_focused(WmParams *wm_params, HWND last_focused_hwnd);
 
 void print_last_error();
