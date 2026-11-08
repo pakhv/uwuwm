@@ -1,8 +1,10 @@
 # uwuwm
 
 # TODO
-  - minimize/restore shortcut
+  - scaling
   - multiple monitors setup
+  - (?) minimize/restore shortcut
+  - (?) zoom in (maximize)
   - reload
   - fix logging
   - funny blink when minimizing an app using its icon (sometimes?) 
