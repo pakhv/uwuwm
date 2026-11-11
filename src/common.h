@@ -32,7 +32,9 @@ BOOL remove_window_with_cleanup(HWND hwnd, WorkspacesVector *workspaces);
 
 void close_window(WmParams *wm_params);
 
-void toggle_pause(WmParams *wm_params);
+void toggle_wm_pause(WmParams *wm_params);
+
+void toggle_window_pause(WmParams *wm_params);
 
 void minimize_restore(WmParams *wm_params);
 
@@ -49,5 +51,9 @@ void set_active_tracking(WmParams *wm_params);
 void restore_windows(WmParams *wm_params);
 
 void focus_window_if_none_focused(WmParams *wm_params, HWND last_focused_hwnd);
+
+BOOL skip_window(WmParams *wm_params, HWND hwnd);
+
+void save_window_position(HWND hwnd, WmParams *wm_params);
 
 void print_last_error();

@@ -54,7 +54,12 @@ void calculate_workspace_windows(Workspace *workspace) {
   for (size_t i = 0; i < workspace->windows->size; i++) {
     Window *window = workspace->windows->data[i];
 
+    if (window->events_paused) {
+      continue;
+    }
+
     window->minimized = IsIconic(window->handle);
+
     if (!window->minimized) {
       windows_vec_add(v_windows, window);
     }
@@ -213,7 +218,7 @@ void close_window(WmParams *wm_params) {
   PostMessage(hwnd, WM_CLOSE, 0, 0);
 }
 
-void toggle_pause(WmParams *wm_params) {
+void toggle_wm_pause(WmParams *wm_params) {
   wm_params->pause_wm = !wm_params->pause_wm;
 
   if (!wm_params->pause_wm) {
@@ -223,6 +228,25 @@ void toggle_pause(WmParams *wm_params) {
 
   position_workspaces_windows(wm_params,
                               wm_params->pause_wm ? WM_SHOWWINDOW : 0);
+}
+
+void toggle_window_pause(WmParams *wm_params) {
+  HWND hwnd = NULL;
+  if (!active_window_belongs_to_active_workspace(wm_params, &hwnd)) {
+    return;
+  }
+
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (!get_window_idx(active_workspace, hwnd, &idx)) {
+    return;
+  }
+
+  active_workspace->windows->data[idx]->events_paused =
+      !active_workspace->windows->data[idx]->events_paused;
+
+  calculate_and_position_active_workspace(wm_params);
 }
 
 void minimize_restore(WmParams *wm_params) {
@@ -475,18 +499,19 @@ BOOL add_window(HWND hwnd, WindowsVector *windows, StrVector *ignored_windows) {
 
   Window *window = malloc(sizeof(Window));
 
-  char *p_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
-  get_process_name_by_window(hwnd, p_name);
+  window->process_name = malloc(sizeof(char) * MAX_EXE_NAME_LENGTH);
+  get_process_name_by_window(hwnd, window->process_name);
 
-  if (is_window_ignored(ignored_windows, p_name)) {
+  if (is_window_ignored(ignored_windows, window->process_name)) {
+    free(window->process_name);
     free(window);
-    free(p_name);
     return TRUE;
   }
 
-  window->process_name = p_name;
   window->handle = hwnd;
   window->user_sized = FALSE;
+  window->minimized = FALSE;
+  window->events_paused = FALSE;
 
   windows_vec_add(windows, window);
 
@@ -667,7 +692,6 @@ void move_window(HWND hwnd, RECT w_rect, WmParams *wm_params) {
   }
 
   // TODO: user can drag a window to a workspace on another monitor
-  Window *window = active_workspace->windows->data[w_idx];
 
   int s_idx = -1;
   for (size_t i = 0; i < active_workspace->windows->size; i++) {
@@ -772,6 +796,33 @@ void rearrange_windows(WindowsVector *windows, int w_idx, int s_idx) {
   windows->data[s_idx] = window;
 }
 
+BOOL skip_window(WmParams *wm_params, HWND hwnd) {
+  char p_name[MAX_EXE_NAME_LENGTH];
+  get_process_name_by_window(hwnd, p_name);
+
+  if (is_window_ignored(wm_params->ignored_windows, p_name)) {
+    return TRUE;
+  }
+
+  for (size_t i = 0; i < wm_params->workspaces->size; i++) {
+    size_t idx;
+    if (get_window_idx(wm_params->workspaces->data[i], hwnd, &idx)) {
+      return wm_params->workspaces->data[i]->windows->data[idx]->events_paused;
+    }
+  }
+
+  return FALSE;
+}
+
+void save_window_position(HWND hwnd, WmParams *wm_params) {
+  Workspace *active_workspace = get_active_workspace(wm_params);
+
+  size_t idx;
+  if (get_window_idx(active_workspace, hwnd, &idx)) {
+    GetWindowRect(hwnd, &active_workspace->windows->data[idx]->w_rect);
+  }
+}
+
 BOOL is_window_ignored(StrVector *ignored_windows, char *p_name) {
   for (size_t i = 0; i < ignored_windows->size; i++) {
     if (strcmp(ignored_windows->data[i], p_name) == 0) {
@@ -834,7 +885,7 @@ void find_next_visible_window(WindowsVector *windows, size_t start_idx,
 
   if (forward_search) {
     for (size_t i = start_idx + 1; i < windows->size; i++) {
-      if (!windows->data[i]->minimized) {
+      if (!windows->data[i]->minimized || !windows->data[i]->events_paused) {
         *idx = i;
         return;
       }
@@ -844,7 +895,7 @@ void find_next_visible_window(WindowsVector *windows, size_t start_idx,
   }
 
   for (int i = start_idx - 1; i >= 0; i--) {
-    if (!windows->data[i]->minimized) {
+    if (!windows->data[i]->minimized || !windows->data[i]->events_paused) {
       *idx = i;
       return;
     }
@@ -859,7 +910,8 @@ void focus_window_if_none_focused(WmParams *wm_params, HWND last_focused_hwnd) {
   }
 
   for (size_t i = 0; i < active_workspace->windows->size; i++) {
-    if (!active_workspace->windows->data[i]->minimized) {
+    if (!active_workspace->windows->data[i]->minimized ||
+        !active_workspace->windows->data[i]->events_paused) {
       return;
     }
   }

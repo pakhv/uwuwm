@@ -46,10 +46,12 @@
 #define MOD_ALT_RIGHT 24
 // pause wm
 #define MOD_ALT_SHIFT_P 25
+// pause window events
+#define MOD_ALT_P 26
 // minimize/restore
-#define MOD_ALT_M 26
+#define MOD_ALT_M 27
 // maximize/restore
-#define MOD_ALT_SHIFT_M 27
+#define MOD_ALT_SHIFT_M 28
 
 #define WINDOW_HIGHLIGHT_ON 0x00FF863A
 #define WINDOW_HIGHLIGHT_OFF 0x00CCCCCC
@@ -70,6 +72,7 @@ typedef struct {
   RECT w_rect;
   BOOL user_sized;
   BOOL minimized;
+  BOOL events_paused;
 } Window;
 
 typedef struct {
